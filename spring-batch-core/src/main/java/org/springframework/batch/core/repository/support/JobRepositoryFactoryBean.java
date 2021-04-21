@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2014 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -181,7 +181,9 @@ public class JobRepositoryFactoryBean extends AbstractJobRepositoryFactoryBean i
 
 		if (databaseType == null) {
 			databaseType = DatabaseType.fromMetaData(dataSource).name();
-			logger.info("No database type set, using meta data indicating: " + databaseType);
+			if (logger.isInfoEnabled()) {
+				logger.info("No database type set, using meta data indicating: " + databaseType);
+			}
 		}
 
 		if (lobHandler == null && databaseType.equalsIgnoreCase(DatabaseType.ORACLE.toString())) {
@@ -194,7 +196,7 @@ public class JobRepositoryFactoryBean extends AbstractJobRepositoryFactoryBean i
 			serializer = defaultSerializer;
 		}
 
-		Assert.isTrue(incrementerFactory.isSupportedIncrementerType(databaseType), "'" + databaseType
+		Assert.isTrue(incrementerFactory.isSupportedIncrementerType(databaseType), () -> "'" + databaseType
 				+ "' is an unsupported database type.  The supported database types are "
 				+ StringUtils.arrayToCommaDelimitedString(incrementerFactory.getSupportedIncrementerTypes()));
 

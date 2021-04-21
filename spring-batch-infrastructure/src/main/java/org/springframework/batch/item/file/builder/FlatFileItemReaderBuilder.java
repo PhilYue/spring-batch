@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -29,6 +29,8 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.springframework.batch.item.file.BufferedReaderFactory;
+import org.springframework.batch.item.file.DefaultBufferedReaderFactory;
 import org.springframework.batch.item.file.FlatFileItemReader;
 import org.springframework.batch.item.file.LineCallbackHandler;
 import org.springframework.batch.item.file.LineMapper;
@@ -52,6 +54,9 @@ import org.springframework.util.StringUtils;
  * A builder implementation for the {@link FlatFileItemReader}.
  *
  * @author Michael Minella
+ * @author Glenn Renfro
+ * @author Mahmoud Ben Hassine
+ * @author Drummond Dawson
  * @since 4.0
  * @see FlatFileItemReader
  */
@@ -59,18 +64,20 @@ public class FlatFileItemReaderBuilder<T> {
 
 	protected Log logger = LogFactory.getLog(getClass());
 
-	private String name;
-
 	private boolean strict = true;
+
+	private String encoding = FlatFileItemReader.DEFAULT_CHARSET;
 
 	private RecordSeparatorPolicy recordSeparatorPolicy =
 			new SimpleRecordSeparatorPolicy();
 
+	private BufferedReaderFactory bufferedReaderFactory =
+			new DefaultBufferedReaderFactory();
+
 	private Resource resource;
 
-	private int maxItemCount = Integer.MAX_VALUE;
-
-	private List<String> comments = new ArrayList<>();
+	private List<String> comments =
+			new ArrayList<>(Arrays.asList(FlatFileItemReader.DEFAULT_COMMENT_PREFIXES));
 
 	private int linesToSkip = 0;
 
@@ -98,12 +105,74 @@ public class FlatFileItemReaderBuilder<T> {
 
 	private boolean beanMapperStrict = true;
 
+	private BigInteger tokenizerValidator = new BigInteger("0");
+
 	private boolean saveState = true;
 
-	private BigInteger tokenizerValidator = new BigInteger("0");
+	private String name;
+
+	private int maxItemCount = Integer.MAX_VALUE;
+
+	private int currentItemCount;
+
+	/**
+	 * Configure if the state of the {@link org.springframework.batch.item.ItemStreamSupport}
+	 * should be persisted within the {@link org.springframework.batch.item.ExecutionContext}
+	 * for restart purposes.
+	 *
+	 * @param saveState defaults to true
+	 * @return The current instance of the builder.
+	 */
+	public FlatFileItemReaderBuilder<T> saveState(boolean saveState) {
+		this.saveState = saveState;
+
+		return this;
+	}
+
+	/**
+	 * The name used to calculate the key within the
+	 * {@link org.springframework.batch.item.ExecutionContext}. Required if
+	 * {@link #saveState(boolean)} is set to true.
+	 *
+	 * @param name name of the reader instance
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.ItemStreamSupport#setName(String)
+	 */
+	public FlatFileItemReaderBuilder<T> name(String name) {
+		this.name = name;
+
+		return this;
+	}
+
+	/**
+	 * Configure the max number of items to be read.
+	 *
+	 * @param maxItemCount the max items to be read
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setMaxItemCount(int)
+	 */
+	public FlatFileItemReaderBuilder<T> maxItemCount(int maxItemCount) {
+		this.maxItemCount = maxItemCount;
+
+		return this;
+	}
+
+	/**
+	 * Index for the current item. Used on restarts to indicate where to start from.
+	 *
+	 * @param currentItemCount current index
+	 * @return this instance for method chaining
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setCurrentItemCount(int)
+	 */
+	public FlatFileItemReaderBuilder<T> currentItemCount(int currentItemCount) {
+		this.currentItemCount = currentItemCount;
+
+		return this;
+	}
 
 	/**
 	 * Add a string to the list of Strings that indicate commented lines.
+	 * Defaults to {@link FlatFileItemReader#DEFAULT_COMMENT_PREFIXES}.
 	 *
 	 * @param comment the string to define a commented line.
 	 * @return The current instance of the builder.
@@ -115,27 +184,16 @@ public class FlatFileItemReaderBuilder<T> {
 	}
 
 	/**
-	 * An array of Strings that indicate lines that are comments (and therefore skipped by
-	 * the reader.
+	 * Set an array of Strings that indicate lines that are comments (and therefore skipped by
+	 * the reader). This method overrides the default comment prefixes which are
+	 * {@link FlatFileItemReader#DEFAULT_COMMENT_PREFIXES}.
 	 *
 	 * @param comments an array of strings to identify comments.
 	 * @return The current instance of the builder.
 	 * @see FlatFileItemReader#setComments(String[])
 	 */
-	public FlatFileItemReaderBuilder<T> comments(String[] comments) {
-		this.comments.addAll(Arrays.asList(comments));
-		return this;
-	}
-
-	/**
-	 * Configure the max number of items to be read.
-	 *
-	 * @param maxItemCount the max items to be read
-	 * @return The current instance of the builder.
-	 * @see FlatFileItemReader#setMaxItemCount(int)
-	 */
-	public FlatFileItemReaderBuilder<T> maxItemCount(int maxItemCount) {
-		this.maxItemCount = maxItemCount;
+	public FlatFileItemReaderBuilder<T> comments(String... comments) {
+		this.comments = Arrays.asList(comments);
 		return this;
 	}
 
@@ -150,6 +208,19 @@ public class FlatFileItemReaderBuilder<T> {
 		this.recordSeparatorPolicy = policy;
 		return this;
 	}
+
+	/**
+	 * Configure a custom {@link BufferedReaderFactory} for the reader.
+	 *
+	 * @param factory custom factory
+	 * @return The current instance of the builder.
+	 * @see FlatFileItemReader#setBufferedReaderFactory(BufferedReaderFactory)
+	 */
+	public FlatFileItemReaderBuilder<T> bufferedReaderFactory(BufferedReaderFactory factory) {
+		this.bufferedReaderFactory = factory;
+		return this;
+	}
+
 
 	/**
 	 * The {@link Resource} to be used as input.
@@ -173,6 +244,19 @@ public class FlatFileItemReaderBuilder<T> {
 	 */
 	public FlatFileItemReaderBuilder<T> strict(boolean strict) {
 		this.strict = strict;
+		return this;
+	}
+
+	/**
+	 * Configure the encoding used by the reader to read the input source.
+	 * Default value is {@link FlatFileItemReader#DEFAULT_CHARSET}.
+	 *
+	 * @param encoding to use to read the input source.
+	 * @return The current instance of the builder.
+	 * @see FlatFileItemReader#setEncoding(String)
+	 */
+	public FlatFileItemReaderBuilder<T> encoding(String encoding) {
+		this.encoding = encoding;
 		return this;
 	}
 
@@ -350,42 +434,14 @@ public class FlatFileItemReaderBuilder<T> {
 	}
 
 	/**
-	 * Configure if the state of the {@link FlatFileItemReader} should be persisted within
-	 * the {@link org.springframework.batch.item.ExecutionContext} for restart purposes.
-	 *
-	 * @param saveState defaults to true
-	 * @return The current instance of the builder.
-	 * @see FlatFileItemReader#setSaveState(boolean)
-	 */
-	public FlatFileItemReaderBuilder<T> saveState(boolean saveState) {
-		this.saveState = saveState;
-		return this;
-	}
-
-	/**
-	 * The name used to calculate the key within the
-	 * {@link org.springframework.batch.item.ExecutionContext}.  Required if
-	 * {@link FlatFileItemReaderBuilder#saveState(boolean)} is set to true.
-	 *
-	 * @param name name of the reader instance
-	 * @return The current instance of the builder.
-	 * @see FlatFileItemReader#setName(String)
-	 */
-	public FlatFileItemReaderBuilder<T> name(String name) {
-		this.name = name;
-		return this;
-	}
-
-	/**
 	 * Builds the {@link FlatFileItemReader}.
 	 *
 	 * @return a {@link FlatFileItemReader}
-	 * @throws Exception if an error occurs during construction
 	 */
-	public FlatFileItemReader<T> build() throws Exception {
+	public FlatFileItemReader<T> build() {
 		if(this.saveState) {
 			Assert.state(StringUtils.hasText(this.name),
-					"A name is required when saveSate is set to true.");
+					"A name is required when saveState is set to true.");
 		}
 
 		if(this.resource == null) {
@@ -394,14 +450,17 @@ public class FlatFileItemReaderBuilder<T> {
 		}
 
 		Assert.notNull(this.recordSeparatorPolicy, "A RecordSeparatorPolicy is required.");
+		Assert.notNull(this.bufferedReaderFactory, "A BufferedReaderFactory is required.");
 		int validatorValue = this.tokenizerValidator.intValue();
-		Assert.state(validatorValue == 1 || validatorValue == 2 || validatorValue == 4,
-				"Only one LineTokenizer option may be configured");
 
 		FlatFileItemReader<T> reader = new FlatFileItemReader<>();
 
 		if(StringUtils.hasText(this.name)) {
 			reader.setName(this.name);
+		}
+
+		if(StringUtils.hasText(this.encoding)) {
+			reader.setEncoding(this.encoding);
 		}
 
 		reader.setResource(this.resource);
@@ -410,9 +469,12 @@ public class FlatFileItemReaderBuilder<T> {
 			reader.setLineMapper(this.lineMapper);
 		}
 		else {
+			Assert.state(validatorValue == 0 || validatorValue == 1 || validatorValue == 2 || validatorValue == 4,
+					"Only one LineTokenizer option may be configured");
+
 			DefaultLineMapper<T> lineMapper = new DefaultLineMapper<>();
 
-			if(this.lineTokenizer != null && this.fieldSetMapper != null) {
+			if(this.lineTokenizer != null) {
 				lineMapper.setLineTokenizer(this.lineTokenizer);
 			}
 			else if(this.fixedLengthBuilder != null) {
@@ -433,7 +495,12 @@ public class FlatFileItemReaderBuilder<T> {
 				mapper.setBeanFactory(this.beanFactory);
 				mapper.setDistanceLimit(this.distanceLimit);
 				mapper.setCustomEditors(this.customEditors);
-				mapper.afterPropertiesSet();
+				try {
+					mapper.afterPropertiesSet();
+				}
+				catch (Exception e) {
+					throw new IllegalStateException("Unable to initialize BeanWrapperFieldSetMapper", e);
+				}
 
 				lineMapper.setFieldSetMapper(mapper);
 			}
@@ -448,14 +515,13 @@ public class FlatFileItemReaderBuilder<T> {
 		}
 
 		reader.setLinesToSkip(this.linesToSkip);
-
-		if(!this.comments.isEmpty()) {
-			reader.setComments(this.comments.toArray(new String[this.comments.size()]));
-		}
+		reader.setComments(this.comments.toArray(new String[this.comments.size()]));
 
 		reader.setSkippedLinesCallback(this.skippedLinesCallback);
 		reader.setRecordSeparatorPolicy(this.recordSeparatorPolicy);
+		reader.setBufferedReaderFactory(this.bufferedReaderFactory);
 		reader.setMaxItemCount(this.maxItemCount);
+		reader.setCurrentItemCount(this.currentItemCount);
 		reader.setSaveState(this.saveState);
 		reader.setStrict(this.strict);
 
@@ -526,7 +592,7 @@ public class FlatFileItemReaderBuilder<T> {
 		 * @return The instance of the builder for chaining.
 		 * @see DelimitedLineTokenizer#setIncludedFields(int[])
 		 */
-		public DelimitedBuilder<T> includedFields(Integer[] fields) {
+		public DelimitedBuilder<T> includedFields(Integer... fields) {
 			this.includedFields.addAll(Arrays.asList(fields));
 			return this;
 		}
@@ -565,7 +631,7 @@ public class FlatFileItemReaderBuilder<T> {
 		 * @return The parent {@link FlatFileItemReaderBuilder}
 		 * @see DelimitedLineTokenizer#setNames(String[])
 		 */
-		public FlatFileItemReaderBuilder<T> names(String [] names) {
+		public FlatFileItemReaderBuilder<T> names(String... names) {
 			this.names.addAll(Arrays.asList(names));
 			return this.parent;
 		}
@@ -574,9 +640,8 @@ public class FlatFileItemReaderBuilder<T> {
 		 * Returns a {@link DelimitedLineTokenizer}
 		 *
 		 * @return {@link DelimitedLineTokenizer}
-		 * @throws Exception if an error occurs during construction
 		 */
-		public DelimitedLineTokenizer build() throws Exception {
+		public DelimitedLineTokenizer build() {
 			Assert.notNull(this.fieldSetFactory, "A FieldSetFactory is required.");
 			Assert.notEmpty(this.names, "A list of field names is required");
 
@@ -584,7 +649,7 @@ public class FlatFileItemReaderBuilder<T> {
 
 			tokenizer.setNames(this.names.toArray(new String[this.names.size()]));
 
-			if(StringUtils.hasText(this.delimiter)) {
+			if(StringUtils.hasLength(this.delimiter)) {
 				tokenizer.setDelimiter(this.delimiter);
 			}
 
@@ -609,7 +674,12 @@ public class FlatFileItemReaderBuilder<T> {
 			tokenizer.setFieldSetFactory(this.fieldSetFactory);
 			tokenizer.setStrict(this.strict);
 
-			tokenizer.afterPropertiesSet();
+			try {
+				tokenizer.afterPropertiesSet();
+			}
+			catch (Exception e) {
+				throw new IllegalStateException("Unable to initialize DelimitedLineTokenizer", e);
+			}
 
 			return tokenizer;
 		}
@@ -642,7 +712,7 @@ public class FlatFileItemReaderBuilder<T> {
 		 * @return This instance for chaining
 		 * @see FixedLengthTokenizer#setColumns(Range[])
 		 */
-		public FixedLengthBuilder<T> columns(Range[] ranges) {
+		public FixedLengthBuilder<T> columns(Range... ranges) {
 			this.ranges.addAll(Arrays.asList(ranges));
 			return this;
 		}
@@ -679,7 +749,7 @@ public class FlatFileItemReaderBuilder<T> {
 		 * @return The parent builder
 		 * @see FixedLengthTokenizer#setNames(String[])
 		 */
-		public FlatFileItemReaderBuilder<T> names(String [] names) {
+		public FlatFileItemReaderBuilder<T> names(String... names) {
 			this.names.addAll(Arrays.asList(names));
 			return this.parent;
 		}

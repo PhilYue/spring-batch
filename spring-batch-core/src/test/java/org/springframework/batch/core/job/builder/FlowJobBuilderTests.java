@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2013 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package org.springframework.batch.core.job.builder;
+
+import java.util.Arrays;
 
 import static org.junit.Assert.assertEquals;
 
@@ -25,18 +27,33 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobInterruptedException;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.Step;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.UnexpectedJobExecutionException;
+import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
+import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.JobScope;
+import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
 import org.springframework.batch.core.job.flow.Flow;
 import org.springframework.batch.core.job.flow.FlowExecutionStatus;
 import org.springframework.batch.core.job.flow.JobExecutionDecider;
+import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.repository.support.MapJobRepositoryFactoryBean;
 import org.springframework.batch.core.step.StepSupport;
+import org.springframework.batch.item.support.ListItemReader;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.lang.Nullable;
 
 /**
  * @author Dave Syer
+ * @author Mahmoud Ben Hassine
  *
  */
 public class FlowJobBuilderTests {
@@ -168,7 +185,7 @@ public class FlowJobBuilderTests {
 		JobExecutionDecider decider = new JobExecutionDecider() {
 			private int count = 0;
 			@Override
-			public FlowExecutionStatus decide(JobExecution jobExecution, StepExecution stepExecution) {
+			public FlowExecutionStatus decide(JobExecution jobExecution, @Nullable StepExecution stepExecution) {
 				count++;
 				return count<2 ? new FlowExecutionStatus("ONGOING") : FlowExecutionStatus.COMPLETED;
 			}
@@ -235,6 +252,47 @@ public class FlowJobBuilderTests {
 		assertEquals(BatchStatus.COMPLETED, execution.getStatus());
 		assertEquals(1, execution.getStepExecutions().size());
 		assertEquals("step2", execution.getStepExecutions().iterator().next().getStepName());
+	}
+
+	@Test
+	public void testBuildWithJobScopedStep() throws Exception {
+		// given
+		ApplicationContext context = new AnnotationConfigApplicationContext(JobConfiguration.class);
+		JobLauncher jobLauncher = context.getBean(JobLauncher.class);
+		Job job = context.getBean(Job.class);
+		JobParameters jobParameters = new JobParametersBuilder()
+				.addLong("chunkSize", 2L)
+				.toJobParameters();
+
+		// when
+		JobExecution jobExecution = jobLauncher.run(job, jobParameters);
+
+		// then
+		assertEquals(ExitStatus.COMPLETED, jobExecution.getExitStatus());
+	}
+
+	@EnableBatchProcessing
+	@Configuration
+	static class JobConfiguration {
+
+		@Bean
+		@JobScope
+		public Step step(StepBuilderFactory stepBuilderFactory,
+						 @Value("#{jobParameters['chunkSize']}") Integer chunkSize) {
+			return stepBuilderFactory.get("step")
+					.<Integer, Integer>chunk(chunkSize)
+					.reader(new ListItemReader<>(Arrays.asList(1, 2, 3, 4)))
+					.writer(items -> {})
+					.build();
+		}
+
+		@Bean
+		public Job job(JobBuilderFactory jobBuilderFactory) {
+			return jobBuilderFactory.get("job")
+					.flow(step(null, null))
+					.build()
+					.build();
+		}
 	}
 
 }

@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2010 the original author or authors.
+ * Copyright 2008-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,6 +25,7 @@ import org.junit.Test;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.item.ItemReader;
@@ -91,6 +92,10 @@ public abstract class AbstractIoSampleTests {
 		return jobLauncherTestUtils.getUniqueJobParameters();
 	}
 
+	protected JobParametersBuilder getUniqueJobParametersBuilder() {
+		return jobLauncherTestUtils.getUniqueJobParametersBuilder();
+	}
+
 	/**
 	 * Configure the reader to read outputs (if necessary). Required for
 	 * file-to-file jobs jobs, usually no-op for database jobs where inputs are
@@ -103,7 +108,7 @@ public abstract class AbstractIoSampleTests {
 	 */
 	private List<CustomerCredit> getCredits(ItemReader<CustomerCredit> reader) throws Exception {
 		CustomerCredit credit;
-		List<CustomerCredit> result = new ArrayList<CustomerCredit>();
+		List<CustomerCredit> result = new ArrayList<>();
 		while ((credit = reader.read()) != null) {
 			result.add(credit);
 		}

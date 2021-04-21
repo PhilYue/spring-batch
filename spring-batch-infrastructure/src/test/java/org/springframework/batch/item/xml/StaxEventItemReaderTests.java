@@ -1,11 +1,11 @@
 /*
- * Copyright 2008-2014 the original author or authors.
+ * Copyright 2008-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,6 +15,8 @@
  */
 package org.springframework.batch.item.xml;
 
+import org.hamcrest.Matchers;
+import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.springframework.batch.item.ExecutionContext;
@@ -29,18 +31,22 @@ import org.springframework.oxm.Unmarshaller;
 import org.springframework.oxm.UnmarshallingFailureException;
 import org.springframework.oxm.XmlMappingException;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.xml.StaxUtils;
 
 import javax.xml.namespace.QName;
 import javax.xml.stream.FactoryConfigurationError;
 import javax.xml.stream.XMLEventReader;
-import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.events.EndElement;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
 import javax.xml.transform.Source;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +62,8 @@ import static org.junit.Assert.fail;
  * Tests for {@link StaxEventItemReader}.
  * 
  * @author Robert Kasanicky
+ * @author Michael Minella
+ * @author Mahmoud Ben Hassine
  */
 public class StaxEventItemReaderTests {
 
@@ -94,7 +102,7 @@ public class StaxEventItemReaderTests {
 	@Before
 	public void setUp() throws Exception {
 		this.executionContext = new ExecutionContext();
-		source = createNewInputSouce();
+		source = createNewInputSource();
 	}
 
 	@Test
@@ -105,7 +113,7 @@ public class StaxEventItemReaderTests {
 	@Test
 	public void testAfterPropertesSetException() throws Exception {
 
-		source = createNewInputSouce();
+		source = createNewInputSource();
 		source.setFragmentRootElementName("");
 		try {
 			source.afterPropertiesSet();
@@ -115,7 +123,7 @@ public class StaxEventItemReaderTests {
 			// expected
 		}
 
-		source = createNewInputSouce();
+		source = createNewInputSource();
 		source.setUnmarshaller(null);
 		try {
 			source.afterPropertiesSet();
@@ -142,9 +150,29 @@ public class StaxEventItemReaderTests {
 		source.close();
 	}
 
+	/**
+	 * Regular usage scenario with custom encoding.
+	 */
+	@Test
+	public void testCustomEncoding() throws Exception {
+		Charset encoding = StandardCharsets.ISO_8859_1;
+		ByteBuffer xmlResource = encoding.encode(xml);
+		source.setResource(new ByteArrayResource(xmlResource.array()));
+		source.setEncoding(encoding.name());
+		source.afterPropertiesSet();
+		source.open(executionContext);
+
+		// see asserts in the mock unmarshaller
+		assertNotNull(source.read());
+		assertNotNull(source.read());
+		assertNull(source.read()); // there are only two fragments
+
+		source.close();
+	}
+
 	@Test
 	public void testItemCountAwareFragment() throws Exception {
-		StaxEventItemReader<ItemCountAwareFragment> source = createNewItemCountAwareInputSouce();
+		StaxEventItemReader<ItemCountAwareFragment> source = createNewItemCountAwareInputSource();
 		source.afterPropertiesSet();
 		source.open(executionContext);
 		assertEquals(1, source.read().getItemCount());
@@ -156,13 +184,13 @@ public class StaxEventItemReaderTests {
 
 	@Test
 	public void testItemCountAwareFragmentRestart() throws Exception {
-		StaxEventItemReader<ItemCountAwareFragment> source = createNewItemCountAwareInputSouce();
+		StaxEventItemReader<ItemCountAwareFragment> source = createNewItemCountAwareInputSource();
 		source.afterPropertiesSet();
 		source.open(executionContext);
 		assertEquals(1, source.read().getItemCount());
 		source.update(executionContext);
 		source.close();
-		source = createNewItemCountAwareInputSouce();
+		source = createNewItemCountAwareInputSource();
 		source.afterPropertiesSet();
 		source.open(executionContext);
 		assertEquals(2, source.read().getItemCount());
@@ -267,7 +295,7 @@ public class StaxEventItemReaderTests {
 		
 		source.close();
 		
-		source = createNewInputSouce();
+		source = createNewInputSource();
 		source.setResource(new ByteArrayResource(xmlMultiFragment.getBytes()));
 		source.setFragmentRootElementNames(MULTI_FRAGMENT_ROOT_ELEMENTS);
 		source.afterPropertiesSet();
@@ -311,7 +339,7 @@ public class StaxEventItemReaderTests {
 		
 		source.close();
 		
-		source = createNewInputSouce();
+		source = createNewInputSource();
 		source.setResource(new ByteArrayResource(xmlMultiFragment.getBytes()));
 		source.setFragmentRootElementNames(MULTI_FRAGMENT_ROOT_ELEMENTS);
 		source.afterPropertiesSet();
@@ -329,7 +357,7 @@ public class StaxEventItemReaderTests {
 	@Test
 	public void testMoveCursorToNextFragment() throws XMLStreamException, FactoryConfigurationError, IOException {
 		Resource resource = new ByteArrayResource(xml.getBytes());
-		XMLEventReader reader = XMLInputFactory.newInstance().createXMLEventReader(resource.getInputStream());
+		XMLEventReader reader = StaxUtils.createDefensiveInputFactory().createXMLEventReader(resource.getInputStream());
 
 		final int EXPECTED_NUMBER_OF_FRAGMENTS = 2;
 		for (int i = 0; i < EXPECTED_NUMBER_OF_FRAGMENTS; i++) {
@@ -346,7 +374,7 @@ public class StaxEventItemReaderTests {
 	@Test
 	public void testMoveCursorToNextFragmentOnEmpty() throws XMLStreamException, FactoryConfigurationError, IOException {
 		Resource resource = new ByteArrayResource(emptyXml.getBytes());
-		XMLEventReader reader = XMLInputFactory.newInstance().createXMLEventReader(resource.getInputStream());
+		XMLEventReader reader = StaxUtils.createDefensiveInputFactory().createXMLEventReader(resource.getInputStream());
 
 		assertFalse(source.moveCursorToNextFragment(reader));
 	}
@@ -357,7 +385,7 @@ public class StaxEventItemReaderTests {
 	@Test
 	public void testMoveCursorToNextFragmentOnMissing() throws XMLStreamException, FactoryConfigurationError, IOException {
 		Resource resource = new ByteArrayResource(missingXml.getBytes());
-		XMLEventReader reader = XMLInputFactory.newInstance().createXMLEventReader(resource.getInputStream());
+		XMLEventReader reader = StaxUtils.createDefensiveInputFactory().createXMLEventReader(resource.getInputStream());
 		assertFalse(source.moveCursorToNextFragment(reader));
 	}
 
@@ -374,7 +402,7 @@ public class StaxEventItemReaderTests {
 		assertEquals(1, executionContext.getInt(ClassUtils.getShortName(StaxEventItemReader.class) + ".read.count"));
 		List<XMLEvent> expectedAfterRestart = source.read();
 
-		source = createNewInputSouce();
+		source = createNewInputSource();
 		source.open(executionContext);
 		List<XMLEvent> afterRestart = source.read();
 		assertEquals(expectedAfterRestart.size(), afterRestart.size());
@@ -396,7 +424,7 @@ public class StaxEventItemReaderTests {
 
 		assertEquals(3, executionContext.getInt(ClassUtils.getShortName(StaxEventItemReader.class) + ".read.count"));
 
-		source = createNewInputSouce();
+		source = createNewInputSource();
 		source.open(executionContext);
 		assertNull(source.read());
 	}
@@ -514,7 +542,7 @@ public class StaxEventItemReaderTests {
 	@Test
 	public void testDirectoryResource() throws Exception {
 
-		FileSystemResource resource = new FileSystemResource("build/data");
+		FileSystemResource resource = new FileSystemResource("target/data");
 		resource.getFile().mkdirs();
 		assertTrue(resource.getFile().isDirectory());
 		source.setResource(resource);
@@ -577,6 +605,39 @@ public class StaxEventItemReaderTests {
 		assertNull(source.read());
 	}
 
+	@Test
+	public void testDtdXml() {
+		String xmlWithDtd = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!DOCTYPE rohit [\n<!ENTITY entityex SYSTEM \"file://" +
+				new File("src/test/resources/org/springframework/batch/support/existing.txt").getAbsolutePath() +
+				"\">\n]>\n<abc>&entityex;</abc>";
+		StaxEventItemReader<String> reader = new StaxEventItemReader<>();
+		reader.setName("foo");
+		reader.setResource(new ByteArrayResource(xmlWithDtd.getBytes()));
+		reader.setUnmarshaller(new MockFragmentUnmarshaller() {
+			@Override
+			public Object unmarshal(Source source) throws XmlMappingException {
+				try {
+					XMLEventReader xmlEventReader = StaxTestUtils.getXmlEventReader(source);
+					xmlEventReader.nextEvent();
+					xmlEventReader.nextEvent();
+					return xmlEventReader.getElementText();
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		});
+		reader.setFragmentRootElementName("abc");
+
+		reader.open(new ExecutionContext());
+
+		try {
+			reader.read();
+			fail("Should fail when XML contains DTD");
+		} catch (Exception e) {
+			Assert.assertThat(e.getMessage(), Matchers.containsString("Undeclared general entity \"entityex\""));
+		}
+	}
+
 	/**
 	 * Stub emulating problems during unmarshalling.
 	 */
@@ -596,10 +657,10 @@ public class StaxEventItemReaderTests {
 
 	}
 
-	private StaxEventItemReader<List<XMLEvent>> createNewInputSouce() {
+	private StaxEventItemReader<List<XMLEvent>> createNewInputSource() {
 		Resource resource = new ByteArrayResource(xml.getBytes());
 
-		StaxEventItemReader<List<XMLEvent>> newSource = new StaxEventItemReader<List<XMLEvent>>();
+		StaxEventItemReader<List<XMLEvent>> newSource = new StaxEventItemReader<>();
 		newSource.setResource(resource);
 
 		newSource.setFragmentRootElementName(FRAGMENT_ROOT_ELEMENT);
@@ -609,10 +670,10 @@ public class StaxEventItemReaderTests {
 		return newSource;
 	}
 
-	private StaxEventItemReader<ItemCountAwareFragment> createNewItemCountAwareInputSouce() {
+	private StaxEventItemReader<ItemCountAwareFragment> createNewItemCountAwareInputSource() {
 		Resource resource = new ByteArrayResource(xml.getBytes());
 
-		StaxEventItemReader<ItemCountAwareFragment> newSource = new StaxEventItemReader<ItemCountAwareFragment>();
+		StaxEventItemReader<ItemCountAwareFragment> newSource = new StaxEventItemReader<>();
 		newSource.setResource(resource);
 
 		newSource.setFragmentRootElementName(FRAGMENT_ROOT_ELEMENT);
@@ -633,7 +694,7 @@ public class StaxEventItemReaderTests {
 		 */
 		private List<XMLEvent> readRecordsInsideFragment(XMLEventReader eventReader, QName fragmentName) throws XMLStreamException {
 			XMLEvent eventInsideFragment;
-			List<XMLEvent> events = new ArrayList<XMLEvent>();
+			List<XMLEvent> events = new ArrayList<>();
 			do {
 				eventInsideFragment = eventReader.peek();
 				if (eventInsideFragment instanceof EndElement
@@ -662,7 +723,7 @@ public class StaxEventItemReaderTests {
 
 			List<XMLEvent> fragmentContent;
 			try {
-				XMLEventReader eventReader = StaxUtils.getXmlEventReader(source);
+				XMLEventReader eventReader = StaxTestUtils.getXmlEventReader(source);
 
 				// first event should be StartDocument
 				XMLEvent event1 = eventReader.nextEvent();

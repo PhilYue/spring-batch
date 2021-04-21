@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2014 the original author or authors.
+ * Copyright 2006-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -30,17 +30,22 @@ import org.springframework.batch.core.JobInstance;
 import org.springframework.batch.core.JobKeyGenerator;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.launch.NoSuchJobException;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 
 /**
  * In-memory implementation of {@link JobInstanceDao}.
+ * 
+ * @deprecated as of v4.3 in favor of using the {@link JdbcJobInstanceDao}
+ * with an in-memory database. Scheduled for removal in v5.0.
  */
+@Deprecated
 public class MapJobInstanceDao implements JobInstanceDao {
 	private static final String STAR_WILDCARD = "\\*";
 	private static final String STAR_WILDCARD_PATTERN = ".*";
 
 	// JDK6 Make a ConcurrentSkipListSet: tends to add on end
-	private final Map<String, JobInstance> jobInstances = new ConcurrentHashMap<String, JobInstance>();
+	private final Map<String, JobInstance> jobInstances = new ConcurrentHashMap<>();
 
 	private JobKeyGenerator<JobParameters> jobKeyGenerator = new DefaultJobKeyGenerator();
 
@@ -63,12 +68,14 @@ public class MapJobInstanceDao implements JobInstanceDao {
 	}
 
 	@Override
+	@Nullable
 	public JobInstance getJobInstance(String jobName, JobParameters jobParameters) {
 		return jobInstances.get(jobName + "|" + jobKeyGenerator.generateKey(jobParameters));
 	}
 
 	@Override
-	public JobInstance getJobInstance(Long instanceId) {
+	@Nullable
+	public JobInstance getJobInstance(@Nullable Long instanceId) {
 		for (Map.Entry<String, JobInstance> instanceEntry : jobInstances.entrySet()) {
 			JobInstance instance = instanceEntry.getValue();
 			if (instance.getId().equals(instanceId)) {
@@ -80,7 +87,7 @@ public class MapJobInstanceDao implements JobInstanceDao {
 
 	@Override
 	public List<String> getJobNames() {
-		List<String> result = new ArrayList<String>();
+		List<String> result = new ArrayList<>();
 		for (Map.Entry<String, JobInstance> instanceEntry : jobInstances.entrySet()) {
 			result.add(instanceEntry.getValue().getJobName());
 		}
@@ -90,7 +97,7 @@ public class MapJobInstanceDao implements JobInstanceDao {
 
 	@Override
 	public List<JobInstance> getJobInstances(String jobName, int start, int count) {
-		List<JobInstance> result = new ArrayList<JobInstance>();
+		List<JobInstance> result = new ArrayList<>();
 		for (Map.Entry<String, JobInstance> instanceEntry : jobInstances.entrySet()) {
 			JobInstance instance = instanceEntry.getValue();
 			if (instance.getJobName().equals(jobName)) {
@@ -104,12 +111,20 @@ public class MapJobInstanceDao implements JobInstanceDao {
 	}
 
 	@Override
+	@Nullable
+	public JobInstance getLastJobInstance(String jobName) {
+		List<JobInstance> jobInstances = getJobInstances(jobName, 0, 1);
+		return jobInstances.isEmpty() ? null : jobInstances.get(0);
+	}
+
+	@Override
+	@Nullable
 	public JobInstance getJobInstance(JobExecution jobExecution) {
 		return jobExecution.getJobInstance();
 	}
 
 	@Override
-	public int getJobInstanceCount(String jobName) throws NoSuchJobException {
+	public int getJobInstanceCount(@Nullable String jobName) throws NoSuchJobException {
 		int count = 0;
 
 		for (Map.Entry<String, JobInstance> instanceEntry : jobInstances.entrySet()) {
@@ -130,7 +145,7 @@ public class MapJobInstanceDao implements JobInstanceDao {
 
 	@Override
 	public List<JobInstance> findJobInstancesByName(String jobName, int start, int count) {
-		List<JobInstance> result = new ArrayList<JobInstance>();
+		List<JobInstance> result = new ArrayList<>();
 		String convertedJobName = jobName.replaceAll(STAR_WILDCARD, STAR_WILDCARD_PATTERN);
 
 		for (Map.Entry<String, JobInstance> instanceEntry : jobInstances.entrySet()) {

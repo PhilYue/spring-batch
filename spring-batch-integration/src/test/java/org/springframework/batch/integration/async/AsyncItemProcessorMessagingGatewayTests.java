@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2007 the original author or authors.
+ * Copyright 2006-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.MethodRule;
@@ -46,7 +45,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 @ContextConfiguration
 public class AsyncItemProcessorMessagingGatewayTests {
 
-	private final AsyncItemProcessor<String, String> processor = new AsyncItemProcessor<String, String>();
+	private final AsyncItemProcessor<String, String> processor = new AsyncItemProcessor<>();
 
 	private final StepExecution stepExecution = MetaDataInstanceFactory.createStepExecution(new JobParametersBuilder().addLong("factor", 2L).toJobParameters());;
 
@@ -78,11 +77,11 @@ public class AsyncItemProcessorMessagingGatewayTests {
 	@Autowired
 	private ItemProcessor<String, String> delegate;
 
-	@Test @Ignore // TODO: Need to figure out why the Rule doesn't work with Spring 4
+	@Test 
 	public void testMultiExecution() throws Exception {
 		processor.setDelegate(delegate);
 		processor.setTaskExecutor(new SimpleAsyncTaskExecutor());
-		List<Future<String>> list = new ArrayList<Future<String>>();
+		List<Future<String>> list = new ArrayList<>();
 		for (int count = 0; count < 10; count++) {
 			list.add(processor.process("foo" + count));
 		}

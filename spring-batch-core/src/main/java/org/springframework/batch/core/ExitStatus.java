@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2014 the original author or authors.
+ * Copyright 2006-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,8 +54,8 @@ public class ExitStatus implements Serializable, Comparable<ExitStatus> {
 	public static final ExitStatus COMPLETED = new ExitStatus("COMPLETED");
 
 	/**
-	 * Convenient constant value representing job that did no processing (e.g.
-	 * because it was already complete).
+	 * Convenient constant value representing job that did no processing
+	 * (e.g. because it was already complete).
 	 */
 	public static final ExitStatus NOOP = new ExitStatus("NOOP");
 
@@ -95,6 +95,8 @@ public class ExitStatus implements Serializable, Comparable<ExitStatus> {
 
 	/**
 	 * Getter for the exit description (defaults to blank)
+	 *
+	 * @return {@link String} containing the exit description.
 	 */
 	public String getExitDescription() {
 		return exitDescription;
@@ -260,7 +262,7 @@ public class ExitStatus implements Serializable, Comparable<ExitStatus> {
 	 * Extract the stack trace from the throwable provided and append it to
 	 * the exist description.
 	 *
-	 * @param throwable
+	 * @param throwable {@link Throwable} instance containing the stack trace.
 	 * @return a new ExitStatus with the stack trace appended
 	 */
 	public ExitStatus addExitDescription(Throwable throwable) {

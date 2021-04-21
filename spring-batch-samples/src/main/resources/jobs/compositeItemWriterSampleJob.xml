@@ -2,8 +2,8 @@
 <beans xmlns="http://www.springframework.org/schema/beans"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="
-		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
-		http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd">
+		http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/batch https://www.springframework.org/schema/batch/spring-batch.xsd">
 
 	<description>
 	<![CDATA[Sample showing usage of CompositeItemWriter.
@@ -74,7 +74,7 @@
 
 	<bean id="fileItemWriter1" class="org.springframework.batch.item.file.FlatFileItemWriter">
 		<property name="name" value="fw1" />
-		<property name="resource" value="file:build/test-outputs/CustomerReport1.txt" />
+		<property name="resource" value="file:target/test-outputs/CustomerReport1.txt" />
 		<property name="lineAggregator">
 			<bean class="org.springframework.batch.item.file.transform.PassThroughLineAggregator" />
 		</property>
@@ -82,7 +82,7 @@
 
 	<bean id="fileItemWriter2" class="org.springframework.batch.item.file.FlatFileItemWriter">
 		<property name="name" value="fw2" />
-		<property name="resource" value="file:build/test-outputs/CustomerReport2.txt" />
+		<property name="resource" value="file:target/test-outputs/CustomerReport2.txt" />
 		<property name="lineAggregator">
 			<bean class="org.springframework.batch.item.file.transform.PassThroughLineAggregator" />
 		</property>

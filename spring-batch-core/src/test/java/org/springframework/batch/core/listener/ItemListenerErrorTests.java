@@ -1,11 +1,11 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.List;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
@@ -31,6 +30,7 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
@@ -43,6 +43,7 @@ import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.lang.Nullable;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
@@ -51,6 +52,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
  * BATCH-2322
  *
  * @author Michael Minella
+ * @author Mahmoud Ben Hassine
  */
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration(classes = {ItemListenerErrorTests.BatchConfiguration.class})
@@ -92,7 +94,6 @@ public class ItemListenerErrorTests {
 		assertEquals(BatchStatus.COMPLETED, execution.getStatus());
 	}
 
-	@Ignore
 	@Test
 	@DirtiesContext
 	public void testOnReadError() throws Exception {
@@ -100,7 +101,16 @@ public class ItemListenerErrorTests {
 		reader.setGoingToFail(true);
 
 		JobExecution execution = jobLauncher.run(job, new JobParameters());
-		assertEquals(BatchStatus.COMPLETED, execution.getStatus());
+		assertEquals(BatchStatus.FAILED, execution.getStatus());
+		StepExecution stepExecution = execution.getStepExecutions().iterator().next();
+		assertEquals(0, stepExecution.getReadCount());
+		assertEquals(50, stepExecution.getReadSkipCount());
+		List<Throwable> failureExceptions = stepExecution.getFailureExceptions();
+		assertEquals(1, failureExceptions.size());
+		Throwable failureException = failureExceptions.iterator().next();
+		assertEquals("Skip limit of '50' exceeded", failureException.getMessage());
+		assertEquals("Error in onReadError.", failureException.getCause().getMessage());
+		assertEquals("onReadError caused this Exception", failureException.getCause().getCause().getMessage());
 	}
 
 	@Test
@@ -187,6 +197,7 @@ public class ItemListenerErrorTests {
 
 		private boolean goingToFail = false;
 
+		@Nullable
 		@Override
 		public String process(String item) throws Exception {
 			if(goingToFail) {
@@ -206,10 +217,11 @@ public class ItemListenerErrorTests {
 
 		private boolean goingToFail = false;
 
-		private ItemReader<String> delegate = new ListItemReader<String>(Collections.singletonList("1"));
+		private ItemReader<String> delegate = new ListItemReader<>(Collections.singletonList("1"));
 
 		private int count = 0;
 
+		@Nullable
 		@Override
 		public String read() throws Exception {
 			count++;
@@ -267,7 +279,7 @@ public class ItemListenerErrorTests {
 		}
 
 		@Override
-		public void afterProcess(String item, String result) {
+		public void afterProcess(String item, @Nullable String result) {
 			if (methodToThrowExceptionFrom.equals("afterProcess")) {
 				throw new RuntimeException("afterProcess caused this Exception");
 			}

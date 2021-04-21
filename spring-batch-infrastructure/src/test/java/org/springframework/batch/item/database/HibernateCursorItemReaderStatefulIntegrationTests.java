@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,11 +41,12 @@ public class HibernateCursorItemReaderStatefulIntegrationTests extends AbstractH
 
 	//Ensure close is called on the stateful session correctly.
 	@Test
+	@SuppressWarnings("unchecked")
 	public void testStatefulClose(){
 
 		SessionFactory sessionFactory = mock(SessionFactory.class);
 		Session session = mock(Session.class);
-		Query scrollableResults = mock(Query.class);
+		Query<Foo> scrollableResults = mock(Query.class);
 		HibernateCursorItemReader<Foo> itemReader = new HibernateCursorItemReader<>();
 		itemReader.setSessionFactory(sessionFactory);
 		itemReader.setQueryString("testQuery");

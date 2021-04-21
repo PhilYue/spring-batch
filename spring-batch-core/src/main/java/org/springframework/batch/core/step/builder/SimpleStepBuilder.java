@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2014 the original author or authors.
+ * Copyright 2006-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.function.Function;
 
 import org.springframework.batch.core.ChunkListener;
 import org.springframework.batch.core.ItemProcessListener;
@@ -46,6 +47,7 @@ import org.springframework.batch.item.ItemProcessor;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemStream;
 import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.function.FunctionItemProcessor;
 import org.springframework.batch.repeat.CompletionPolicy;
 import org.springframework.batch.repeat.RepeatOperations;
 import org.springframework.batch.repeat.policy.SimpleCompletionPolicy;
@@ -61,6 +63,7 @@ import org.springframework.util.Assert;
  * @see FaultTolerantStepBuilder for a step that handles retry and skip of failed items
  *
  * @author Dave Syer
+ * @author Mahmoud Ben Hassine
  *
  * @since 2.2
  */
@@ -74,13 +77,15 @@ public class SimpleStepBuilder<I, O> extends AbstractTaskletStepBuilder<SimpleSt
 
 	private ItemProcessor<? super I, ? extends O> processor;
 
+	private Function<? super I, ? extends O> itemProcessorFunction;
+
 	private int chunkSize = 0;
 
 	private RepeatOperations chunkOperations;
 
 	private CompletionPolicy completionPolicy;
 
-	private Set<StepListener> itemListeners = new LinkedHashSet<StepListener>();
+	private Set<StepListener> itemListeners = new LinkedHashSet<>();
 
 	private boolean readerTransactionalQueue = false;
 
@@ -111,7 +116,7 @@ public class SimpleStepBuilder<I, O> extends AbstractTaskletStepBuilder<SimpleSt
 	}
 
 	public FaultTolerantStepBuilder<I, O> faultTolerant() {
-		return new FaultTolerantStepBuilder<I, O>(this);
+		return new FaultTolerantStepBuilder<>(this);
 	}
 
 	/**
@@ -152,13 +157,13 @@ public class SimpleStepBuilder<I, O> extends AbstractTaskletStepBuilder<SimpleSt
 	@Override
 	protected Tasklet createTasklet() {
 		Assert.state(reader != null, "ItemReader must be provided");
-		Assert.state(processor != null || writer != null, "ItemWriter or ItemProcessor must be provided");
+		Assert.state(writer != null, "ItemWriter must be provided");
 		RepeatOperations repeatOperations = createChunkOperations();
-		SimpleChunkProvider<I> chunkProvider = new SimpleChunkProvider<I>(reader, repeatOperations);
-		SimpleChunkProcessor<I, O> chunkProcessor = new SimpleChunkProcessor<I, O>(processor, writer);
-		chunkProvider.setListeners(new ArrayList<StepListener>(itemListeners));
-		chunkProcessor.setListeners(new ArrayList<StepListener>(itemListeners));
-		ChunkOrientedTasklet<I> tasklet = new ChunkOrientedTasklet<I>(chunkProvider, chunkProcessor);
+		SimpleChunkProvider<I> chunkProvider = new SimpleChunkProvider<>(getReader(), repeatOperations);
+		SimpleChunkProcessor<I, O> chunkProcessor = new SimpleChunkProcessor<>(getProcessor(), getWriter());
+		chunkProvider.setListeners(new ArrayList<>(itemListeners));
+		chunkProcessor.setListeners(new ArrayList<>(itemListeners));
+		ChunkOrientedTasklet<I> tasklet = new ChunkOrientedTasklet<>(chunkProvider, chunkProcessor);
 		tasklet.setBuffering(!readerTransactionalQueue);
 		return tasklet;
 	}
@@ -226,6 +231,19 @@ public class SimpleStepBuilder<I, O> extends AbstractTaskletStepBuilder<SimpleSt
 	 */
 	public SimpleStepBuilder<I, O> processor(ItemProcessor<? super I, ? extends O> processor) {
 		this.processor = processor;
+		return this;
+	}
+
+	/**
+	 * A {@link Function} to be delegated to as an {@link ItemProcessor}.  If this is set,
+	 * it will take precedence over any {@code ItemProcessor} configured via
+	 * {@link #processor(ItemProcessor)}.
+	 *
+	 * @param function the function to delegate item processing to
+	 * @return this for fluent chaining
+	 */
+	public SimpleStepBuilder<I, O> processor(Function<? super I, ? extends O> function) {
+		this.itemProcessorFunction = function;
 		return this;
 	}
 
@@ -339,6 +357,10 @@ public class SimpleStepBuilder<I, O> extends AbstractTaskletStepBuilder<SimpleSt
 	}
 
 	protected ItemProcessor<? super I, ? extends O> getProcessor() {
+		if(this.itemProcessorFunction != null) {
+			this.processor = new FunctionItemProcessor<>(this.itemProcessorFunction);
+		}
+
 		return processor;
 	}
 
@@ -366,7 +388,9 @@ public class SimpleStepBuilder<I, O> extends AbstractTaskletStepBuilder<SimpleSt
 			return completionPolicy;
 		}
 		if (chunkSize == 0) {
-			logger.info("Setting commit interval to default value (" + DEFAULT_COMMIT_INTERVAL + ")");
+			if (logger.isInfoEnabled()) {
+				logger.info("Setting commit interval to default value (" + DEFAULT_COMMIT_INTERVAL + ")");
+			}
 			chunkSize = DEFAULT_COMMIT_INTERVAL;
 		}
 		return new SimpleCompletionPolicy(chunkSize);

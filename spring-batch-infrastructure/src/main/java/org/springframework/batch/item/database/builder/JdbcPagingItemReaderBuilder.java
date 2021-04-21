@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,7 @@ import org.springframework.batch.item.database.support.SqlServerPagingQueryProvi
 import org.springframework.batch.item.database.support.SqlitePagingQueryProvider;
 import org.springframework.batch.item.database.support.SybasePagingQueryProvider;
 import org.springframework.batch.support.DatabaseType;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.support.MetaDataAccessException;
 import org.springframework.util.Assert;
@@ -45,6 +46,8 @@ import org.springframework.util.Assert;
  * will be used.
  *
  * @author Michael Minella
+ * @author Glenn Renfro
+ * @author Drummond Dawson
  * @since 4.0
  * @see JdbcPagingItemReader
  */
@@ -62,14 +65,6 @@ public class JdbcPagingItemReaderBuilder<T> {
 
 	private int pageSize = 10;
 
-	private boolean saveState = true;
-
-	private String name;
-
-	private int maxItemCount = Integer.MAX_VALUE;
-
-	private int currentItemCount = 0;
-
 	private String groupClause;
 
 	private String selectClause;
@@ -79,6 +74,69 @@ public class JdbcPagingItemReaderBuilder<T> {
 	private String whereClause;
 
 	private Map<String, Order> sortKeys;
+
+	private boolean saveState = true;
+
+	private String name;
+
+	private int maxItemCount = Integer.MAX_VALUE;
+
+	private int currentItemCount;
+
+	/**
+	 * Configure if the state of the {@link org.springframework.batch.item.ItemStreamSupport}
+	 * should be persisted within the {@link org.springframework.batch.item.ExecutionContext}
+	 * for restart purposes.
+	 *
+	 * @param saveState defaults to true
+	 * @return The current instance of the builder.
+	 */
+	public JdbcPagingItemReaderBuilder<T> saveState(boolean saveState) {
+		this.saveState = saveState;
+
+		return this;
+	}
+
+	/**
+	 * The name used to calculate the key within the
+	 * {@link org.springframework.batch.item.ExecutionContext}. Required if
+	 * {@link #saveState(boolean)} is set to true.
+	 *
+	 * @param name name of the reader instance
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.ItemStreamSupport#setName(String)
+	 */
+	public JdbcPagingItemReaderBuilder<T> name(String name) {
+		this.name = name;
+
+		return this;
+	}
+
+	/**
+	 * Configure the max number of items to be read.
+	 *
+	 * @param maxItemCount the max items to be read
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setMaxItemCount(int)
+	 */
+	public JdbcPagingItemReaderBuilder<T> maxItemCount(int maxItemCount) {
+		this.maxItemCount = maxItemCount;
+
+		return this;
+	}
+
+	/**
+	 * Index for the current item. Used on restarts to indicate where to start from.
+	 *
+	 * @param currentItemCount current index
+	 * @return this instance for method chaining
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setCurrentItemCount(int)
+	 */
+	public JdbcPagingItemReaderBuilder<T> currentItemCount(int currentItemCount) {
+		this.currentItemCount = currentItemCount;
+
+		return this;
+	}
 
 	/**
 	 * The {@link DataSource} to query against.  Required.
@@ -120,6 +178,20 @@ public class JdbcPagingItemReaderBuilder<T> {
 	}
 
 	/**
+	 * Creates a {@link BeanPropertyRowMapper} to be used as your
+	 * {@link RowMapper}.
+	 *
+	 * @param mappedClass the class for the row mapper
+	 * @return this instance for method chaining
+	 * @see BeanPropertyRowMapper
+	 */
+	public JdbcPagingItemReaderBuilder<T> beanRowMapper(Class<T> mappedClass) {
+		this.rowMapper = new BeanPropertyRowMapper<>(mappedClass);
+
+		return this;
+	}
+
+	/**
 	 * A {@link Map} of values to set on the SQL's prepared statement.
 	 *
 	 * @param parameterValues Map of values
@@ -147,62 +219,8 @@ public class JdbcPagingItemReaderBuilder<T> {
 	}
 
 	/**
-	 * Set to false in a multithreaded environment (restart is disabled).  If set to true,
-	 * a name is required.  Defaults to true.
-	 *
-	 * @param saveState determine if the reader's state should be persisted
-	 * @return this instance for method chaining
-	 * @see JdbcPagingItemReader#setSaveState(boolean)
-	 */
-	public JdbcPagingItemReaderBuilder<T> saveState(boolean saveState) {
-		this.saveState = saveState;
-
-		return this;
-	}
-
-	/**
-	 * A name used to prevent key collissions while saving the state in the
-	 * {@link org.springframework.batch.item.ExecutionContext}
-	 *
-	 * @param name unique name for this reader instance
-	 * @return this instance for method chaining
-	 * @see JdbcPagingItemReader#setName(String)
-	 */
-	public JdbcPagingItemReaderBuilder<T> name(String name) {
-		this.name = name;
-
-		return this;
-	}
-
-	/**
-	 * Maximum number of items to read.
-	 *
-	 * @param count number of items
-	 * @return this instance for method chaining
-	 * @see JdbcPagingItemReader#setMaxItemCount(int)
-	 */
-	public JdbcPagingItemReaderBuilder<T> maxItemCount(int count) {
-		this.maxItemCount = count;
-
-		return this;
-	}
-
-	/**
-	 * The current index of the item to read.
-	 *
-	 * @param count current index
-	 * @return this instance for method chaining
-	 * @see JdbcPagingItemReader#setCurrentItemCount(int)
-	 */
-	public JdbcPagingItemReaderBuilder<T> currentItemCount(int count) {
-		this.currentItemCount = count;
-
-		return this;
-	}
-
-	/**
 	 * The SQL <code>GROUP BY</code> clause for a db specific @{@link PagingQueryProvider}.
-	 * This is only used if a PaginingQueryProvider is not provided.
+	 * This is only used if a PagingQueryProvider is not provided.
 	 *
 	 * @param groupClause the SQL clause
 	 * @return this instance for method chaining
@@ -216,7 +234,7 @@ public class JdbcPagingItemReaderBuilder<T> {
 
 	/**
 	 * The SQL <code>SELECT</code> clause for a db specific {@link PagingQueryProvider}.
-	 * This is only used if a PagingQueyrProvider is not provided.
+	 * This is only used if a PagingQueryProvider is not provided.
 	 *
 	 * @param selectClause the SQL clause
 	 * @return this instance for method chaining
@@ -329,7 +347,7 @@ public class JdbcPagingItemReaderBuilder<T> {
 	private PagingQueryProvider determineQueryProvider(DataSource dataSource) {
 
 		try {
-			DatabaseType databaseType = DatabaseType.fromMetaData(this.dataSource);
+			DatabaseType databaseType = DatabaseType.fromMetaData(dataSource);
 
 			AbstractSqlPagingQueryProvider provider;
 
@@ -349,7 +367,8 @@ public class JdbcPagingItemReaderBuilder<T> {
 				case SYBASE: provider = new SybasePagingQueryProvider(); break;
 				case SQLITE: provider = new SqlitePagingQueryProvider(); break;
 				default:
-					throw new IllegalArgumentException("Unalbe to determine PaaginQueryProvider type");
+					throw new IllegalArgumentException("Unable to determine PagingQueryProvider type " +
+							"from database type: " + databaseType);
 			}
 
 			provider.setSelectClause(this.selectClause);

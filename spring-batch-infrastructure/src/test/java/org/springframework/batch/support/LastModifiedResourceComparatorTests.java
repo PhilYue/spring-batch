@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2007 the original author or authors.
+ * Copyright 2006-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,6 +27,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * @author Dave Syer
+ * @author Mahmoud Ben Hassine
  * 
  */
 public class LastModifiedResourceComparatorTests {
@@ -56,25 +57,6 @@ public class LastModifiedResourceComparatorTests {
 		temp.deleteOnExit();
 		assertTrue(temp.exists());
 		assertEquals(1, comparator.compare(new FileSystemResource(temp), new FileSystemResource(FILE_PATH)));
-	}
-
-	@Test
-	public void testCompareNewWithOldAfterCopy() throws Exception {
-		File temp1 = new File("build/temp1.txt");
-		File temp2 = new File("build/temp2.txt");
-		if (temp1.exists()) temp1.delete();
-		if (temp2.exists()) temp2.delete();
-		temp1.getParentFile().mkdirs();
-		temp2.createNewFile();
-		assertTrue(!temp1.exists() && temp2.exists());
-		// For Linux sleep here otherwise files show same
-		// modified date
-		Thread.sleep(1000);
-		// Need to explicitly ask not to preserve the last modified date when we
-		// copy...
-
-		FileUtils.copyFile(new FileSystemResource(FILE_PATH).getFile(), temp1, false);
-		assertEquals(1, comparator.compare(new FileSystemResource(temp1), new FileSystemResource(temp2)));
 	}
 
 }

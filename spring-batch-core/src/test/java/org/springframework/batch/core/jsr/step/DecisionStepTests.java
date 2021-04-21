@@ -1,11 +1,11 @@
 /*
- * Copyright 2013-2017 the original author or authors.
+ * Copyright 2013-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,45 +17,21 @@ package org.springframework.batch.core.jsr.step;
 
 import java.util.List;
 import java.util.Properties;
+
 import javax.batch.api.Decider;
 import javax.batch.runtime.BatchRuntime;
 import javax.batch.runtime.BatchStatus;
 import javax.batch.runtime.JobExecution;
 import javax.batch.runtime.StepExecution;
 
-import org.junit.Before;
 import org.junit.Test;
 
-import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.batch.core.jsr.AbstractJsrTestCase;
-import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.support.GenericXmlApplicationContext;
 import org.springframework.util.Assert;
 
 import static org.junit.Assert.assertEquals;
 
 public class DecisionStepTests extends AbstractJsrTestCase {
-
-	private static ApplicationContext baseContext;
-
-	private JobExplorer jobExplorer;
-
-	@Before
-	public void setUp() {
-		StepExecutionCountingDecider.previousStepCount = 0;
-
-		if(jobExplorer == null) {
-			baseContext = new GenericXmlApplicationContext("jsrBaseContext.xml");
-
-			baseContext.getAutowireCapableBeanFactory().autowireBeanProperties(this,
-					AutowireCapableBeanFactory.AUTOWIRE_BY_NAME, false);
-		}
-	}
-
-	public void setJobExplorer(JobExplorer jobExplorer) {
-		this.jobExplorer = jobExplorer;
-	}
 
 	@Test
 	public void testDecisionAsFirstStepOfJob() throws Exception {
@@ -101,16 +77,8 @@ public class DecisionStepTests extends AbstractJsrTestCase {
 	@Test
 	public void testDecisionAfterFlow() throws Exception {
 		JobExecution execution = runJob("DecisionStepTests-decisionAfterFlow-context", new Properties(), 10000L);
-		assertEquals(BatchStatus.COMPLETED, execution.getBatchStatus());
+		assertEquals(execution.getExitStatus(), BatchStatus.COMPLETED, execution.getBatchStatus());
 		assertEquals(3, BatchRuntime.getJobOperator().getStepExecutions(execution.getExecutionId()).size());
-	}
-
-	@Test
-	public void testDecisionAfterSplit() throws Exception {
-		JobExecution execution = runJob("DecisionStepTests-decisionAfterSplit-context", new Properties(), 10000L);
-		assertEquals(BatchStatus.COMPLETED, execution.getBatchStatus());
-		assertEquals(4, BatchRuntime.getJobOperator().getStepExecutions(execution.getExecutionId()).size());
-		assertEquals(2, StepExecutionCountingDecider.previousStepCount);
 	}
 
 	@Test
@@ -149,17 +117,6 @@ public class DecisionStepTests extends AbstractJsrTestCase {
 			} else {
 				return "CONTINUE";
 			}
-		}
-	}
-
-	public static class StepExecutionCountingDecider implements Decider {
-
-		static int previousStepCount = 0;
-
-		@Override
-		public String decide(StepExecution[] executions) throws Exception {
-			previousStepCount = executions.length;
-			return "next";
 		}
 	}
 

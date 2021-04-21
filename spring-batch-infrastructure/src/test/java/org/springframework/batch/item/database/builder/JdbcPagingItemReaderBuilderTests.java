@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,6 +46,7 @@ import static org.junit.Assert.fail;
 
 /**
  * @author Michael Minella
+ * @author Drummond Dawson
  */
 public class JdbcPagingItemReaderBuilderTests {
 
@@ -255,6 +256,34 @@ public class JdbcPagingItemReaderBuilderTests {
 	}
 
 	@Test
+	public void testBeanRowMapper() throws Exception {
+		Map<String, Order> sortKeys = new HashMap<>(1);
+		sortKeys.put("ID", Order.DESCENDING);
+
+		JdbcPagingItemReader<Foo> reader = new JdbcPagingItemReaderBuilder<Foo>()
+				.name("fooReader")
+				.currentItemCount(1)
+				.dataSource(this.dataSource)
+				.maxItemCount(2)
+				.selectClause("SELECT ID, FIRST, SECOND, THIRD")
+				.fromClause("FOO")
+				.sortKeys(sortKeys)
+				.beanRowMapper(Foo.class)
+				.build();
+
+		reader.afterPropertiesSet();
+
+		reader.open(new ExecutionContext());
+		Foo item1 = reader.read();
+		assertNull(reader.read());
+
+		assertEquals(3, item1.getId());
+		assertEquals(10, item1.getFirst());
+		assertEquals("11", item1.getSecond());
+		assertEquals("12", item1.getThird());
+	}
+
+	@Test
 	public void testValidation() {
 
 		try {
@@ -341,6 +370,8 @@ public class JdbcPagingItemReaderBuilderTests {
 		private int first;
 		private String second;
 		private String third;
+
+		public Foo() {}
 
 		public Foo(int id, int first, String second, String third) {
 			this.id = id;

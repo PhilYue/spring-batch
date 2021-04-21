@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -41,14 +41,14 @@ public class GroovyJobFunctionalTests {
 
 	@Before
 	public void removeOldData() throws IOException {
-		FileUtils.deleteDirectory(new File("build/groovyJob"));
+		FileUtils.deleteDirectory(new File("target/groovyJob"));
 	}
 
 	@Test
 	public void testLaunchJob() throws Exception {
-		assertFalse(new File("build/groovyJob/output/files.zip").exists());
+		assertFalse(new File("target/groovyJob/output/files.zip").exists());
 		jobLauncherTestUtils.launchJob();
-		assertTrue(new File("build/groovyJob/output/files.zip").exists());
+		assertTrue(new File("target/groovyJob/output/files.zip").exists());
 	}
 
 }

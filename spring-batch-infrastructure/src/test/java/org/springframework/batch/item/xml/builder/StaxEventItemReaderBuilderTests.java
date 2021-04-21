@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,11 @@
  */
 package org.springframework.batch.item.xml.builder;
 
+import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import javax.xml.bind.annotation.XmlRootElement;
+import javax.xml.stream.XMLInputFactory;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -31,10 +35,14 @@ import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
+import static org.springframework.test.util.ReflectionTestUtils.getField;
 
 /**
  * @author Michael Minella
+ * @author Mahmoud Ben Hassine
+ * @author Parikshit Dutta
  */
 public class StaxEventItemReaderBuilderTests {
 
@@ -53,13 +61,6 @@ public class StaxEventItemReaderBuilderTests {
 
 	@Test
 	public void testValidation() {
-		try {
-			new StaxEventItemReaderBuilder<Foo>().build();
-			fail("Validation of the missing resource failed");
-		}
-		catch (IllegalArgumentException ignore) {
-		}
-
 		try {
 			new StaxEventItemReaderBuilder<Foo>()
 					.resource(this.resource)
@@ -84,6 +85,16 @@ public class StaxEventItemReaderBuilderTests {
 	}
 
 	@Test
+	public void testBuildWithoutProvidingResource() {
+		StaxEventItemReader<Foo> reader = new StaxEventItemReaderBuilder<Foo>()
+				.name("fooReader")
+				.addFragmentRootElements("foo")
+				.build();
+
+		assertNotNull(reader);
+	}
+
+	@Test
 	public void testConfiguration() throws Exception {
 		Jaxb2Marshaller unmarshaller = new Jaxb2Marshaller();
 		unmarshaller.setClassesToBeBound(Foo.class);
@@ -95,6 +106,45 @@ public class StaxEventItemReaderBuilderTests {
 				.currentItemCount(1)
 				.maxItemCount(2)
 				.unmarshaller(unmarshaller)
+				.xmlInputFactory(XMLInputFactory.newInstance())
+				.build();
+
+		reader.afterPropertiesSet();
+
+		ExecutionContext executionContext = new ExecutionContext();
+		reader.open(executionContext);
+		Foo item = reader.read();
+		assertNull(reader.read());
+		reader.update(executionContext);
+
+		reader.close();
+
+		assertEquals(4, item.getFirst());
+		assertEquals("five", item.getSecond());
+		assertEquals("six", item.getThird());
+		assertEquals(2, executionContext.size());
+
+		Object executionContextUserSupport = getField(reader, "executionContextUserSupport");
+		assertEquals("fooReader", getField(executionContextUserSupport, "name"));
+	}
+
+	@Test
+	public void testCustomEncoding() throws Exception {
+		Jaxb2Marshaller unmarshaller = new Jaxb2Marshaller();
+		unmarshaller.setClassesToBeBound(Foo.class);
+
+		Charset charset = StandardCharsets.ISO_8859_1;
+		ByteBuffer xml = charset.encode(SIMPLE_XML);
+
+		StaxEventItemReader<Foo> reader = new StaxEventItemReaderBuilder<Foo>()
+				.name("fooReader")
+				.resource(new ByteArrayResource(xml.array()))
+				.encoding(charset.name())
+				.addFragmentRootElements("foo")
+				.currentItemCount(1)
+				.maxItemCount(2)
+				.unmarshaller(unmarshaller)
+				.xmlInputFactory(XMLInputFactory.newInstance())
 				.build();
 
 		reader.afterPropertiesSet();

@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2007 the original author or authors.
+ * Copyright 2006-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -123,7 +123,7 @@ public class DefaultFieldSet implements FieldSet {
 		if (names == null) {
 			throw new IllegalStateException("Field names are not known");
 		}
-		return names.toArray(new String[names.size()]);
+		return names.toArray(new String[0]);
 	}
 
 	/*
@@ -649,6 +649,8 @@ public class DefaultFieldSet implements FieldSet {
 
 	/**
 	 * Read and trim the {@link String} value at '<code>index</code>'.
+	 *
+	 * @param index the offset in the token array to obtain the value to be trimmed.
 	 * 
 	 * @return null if the field value is <code>null</code>.
 	 */
@@ -664,9 +666,12 @@ public class DefaultFieldSet implements FieldSet {
 	}
 
 	/**
-	 * Read and trim the {@link String} value from column with given '
-	 * <code>name</code>.
-	 * 
+	 * Retrieve the index of where a specified column is located based on the
+	 * {@code name} parameter.
+	 *
+	 * @param name the value to search in the {@link List} of names.
+	 * @return the index in the {@link List} of names where the name was found.
+	 *
 	 * @throws IllegalArgumentException if a column with given name is not
 	 * defined.
 	 */

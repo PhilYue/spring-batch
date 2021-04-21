@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -182,8 +182,10 @@ public class MethodInvokerUtils {
 	 * Create a {@link MethodInvoker} for the delegate from a single public
 	 * method.
 	 * 
-	 * @param target an object to search for an appropriate method
-	 * @return a MethodInvoker that calls a method on the delegate
+	 * @param target an object to search for an appropriate method.
+	 * @param <C> the class.
+	 * @param <T> the type.
+	 * @return a {@link MethodInvoker} that calls a method on the delegate.
 	 */
 	public static <C, T> MethodInvoker getMethodInvokerForSingleArgument(Object target) {
 		final AtomicReference<Method> methodHolder = new AtomicReference<>();

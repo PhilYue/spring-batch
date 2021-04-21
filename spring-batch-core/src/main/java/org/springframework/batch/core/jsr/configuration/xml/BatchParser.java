@@ -1,11 +1,11 @@
 /*
- * Copyright 2013 the original author or authors.
+ * Copyright 2013-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -61,17 +61,19 @@ public class BatchParser extends AbstractBeanDefinitionParser {
 
 		if(beanElements.size() > 0) {
 			for (Element curElement : beanElements) {
-				AbstractBeanDefinition beanDefintion = BeanDefinitionBuilder.genericBeanDefinition(curElement.getAttribute("class"))
+				AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition(curElement.getAttribute("class"))
 						.getBeanDefinition();
 
-				beanDefintion.setScope("step");
+				beanDefinition.setScope("step");
 
 				String beanName = curElement.getAttribute("id");
 
 				if(!registry.containsBeanDefinition(beanName)) {
-					registry.registerBeanDefinition(beanName, beanDefintion);
+					registry.registerBeanDefinition(beanName, beanDefinition);
 				} else {
-					logger.info("Ignoring batch.xml bean defintion for " + beanName + " because another bean of the same name has been registered");
+					if (logger.isInfoEnabled()) {
+						logger.info("Ignoring batch.xml bean definition for " + beanName + " because another bean of the same name has been registered");
+					}
 				}
 			}
 		}

@@ -1,11 +1,11 @@
 /*
- * Copyright 2012 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -33,6 +33,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.repository.PagingAndSortingRepository;
+import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.MethodInvoker;
@@ -59,7 +60,18 @@ import org.springframework.util.MethodInvoker;
  * <code>saveState=false</code> if used in a multi-threaded client (no restart available).
  * </p>
  *
+ * <p>It is important to note that this is a paging item reader and exceptions that are
+ * thrown while reading the page itself (mapping results to objects, etc in the
+ * {@link RepositoryItemReader#doPageRead()}) will not be skippable since this reader has
+ * no way of knowing if an exception should be skipped and therefore will continue to read
+ * the same page until the skip limit is exceeded.</p>
+ *
+ * <p>
+ * NOTE: The {@code RepositoryItemReader} only reads Java Objects i.e. non primitives.
+ * </p>
+ *
  * @author Michael Minella
+ * @author Antoine Kapps
  * @since 2.2
  */
 public class RepositoryItemReader<T> extends AbstractItemCountingItemStreamItemReader<T> implements InitializingBean {
@@ -80,7 +92,7 @@ public class RepositoryItemReader<T> extends AbstractItemCountingItemStreamItemR
 
 	private volatile List<T> results;
 
-	private Object lock = new Object();
+	private final Object lock = new Object();
 
 	private String methodName;
 
@@ -140,23 +152,28 @@ public class RepositoryItemReader<T> extends AbstractItemCountingItemStreamItemR
 		Assert.state(sort != null, "A sort is required");
 	}
 
+	@Nullable
 	@Override
 	protected T doRead() throws Exception {
 
 		synchronized (lock) {
-			if(results == null || current >= results.size()) {
+			boolean nextPageNeeded = (results != null && current >= results.size());
+
+			if (results == null || nextPageNeeded) {
 
 				if (logger.isDebugEnabled()) {
 					logger.debug("Reading page " + page);
 				}
 
 				results = doPageRead();
-
-				current = 0;
 				page ++;
 
 				if(results.size() <= 0) {
 					return null;
+				}
+
+				if (nextPageNeeded) {
+					current = 0;
 				}
 			}
 
@@ -174,11 +191,8 @@ public class RepositoryItemReader<T> extends AbstractItemCountingItemStreamItemR
 	@Override
 	protected void jumpToItem(int itemLastIndex) throws Exception {
 		synchronized (lock) {
-			page = (itemLastIndex - 1) / pageSize;
-			current = (itemLastIndex - 1) % pageSize;
-
-			results = doPageRead();
-			page++;
+			page = itemLastIndex / pageSize;
+			current = itemLastIndex % pageSize;
 		}
 	}
 

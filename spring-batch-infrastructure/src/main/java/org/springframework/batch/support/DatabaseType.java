@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -52,7 +52,7 @@ public enum DatabaseType {
 	private static final Map<String, DatabaseType> nameMap;
 
 	static{
-		nameMap = new HashMap<String, DatabaseType>();
+		nameMap = new HashMap<>();
 		for(DatabaseType type: values()){
 			nameMap.put(type.getProductName(), type);
 		}
@@ -72,11 +72,14 @@ public enum DatabaseType {
 	/**
 	 * Static method to obtain a DatabaseType from the provided product name.
 	 *
-	 * @param productName
-	 * @return DatabaseType for given product name.
+	 * @param productName {@link String} containing the product name.
+	 * @return the {@link DatabaseType} for given product name.
+	 *
 	 * @throws IllegalArgumentException if none is found.
 	 */
 	public static DatabaseType fromProductName(String productName){
+		if(productName.equals("MariaDB"))
+			productName = "MySQL";
 		if(!nameMap.containsKey(productName)){
 			throw new IllegalArgumentException("DatabaseType not found for product name: [" +
 					productName + "]");
@@ -89,9 +92,10 @@ public enum DatabaseType {
 	/**
 	 * Convenience method that pulls a database product name from the DataSource's metadata.
 	 *
-	 * @param dataSource
-	 * @return DatabaseType
-	 * @throws MetaDataAccessException
+	 * @param dataSource {@link DataSource} to the database to be used.
+	 * @return {@link DatabaseType} for the {@link DataSource} specified.
+	 *
+	 * @throws MetaDataAccessException thrown if error occured during Metadata lookup.
 	 */
 	public static DatabaseType fromMetaData(DataSource dataSource) throws MetaDataAccessException {
 		String databaseProductName =

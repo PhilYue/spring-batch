@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2011 the original author or authors.
+ * Copyright 2006-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,7 +15,9 @@
  */
 package org.springframework.batch.core.job.builder;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,13 +28,18 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.JobParametersIncrementer;
 import org.springframework.batch.core.JobParametersValidator;
+import org.springframework.batch.core.annotation.AfterJob;
+import org.springframework.batch.core.annotation.BeforeJob;
 import org.springframework.batch.core.job.AbstractJob;
+import org.springframework.batch.core.listener.JobListenerFactoryBean;
 import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.support.ReflectionUtils;
 
 /**
  * A base class and utility for other job builders providing access to common properties like job repository.
  * 
  * @author Dave Syer
+ * @author Mahmoud Ben Hassine
  * 
  * @since 2.2
  */
@@ -90,6 +97,28 @@ public abstract class JobBuilderHelper<B extends JobBuilderHelper<B>> {
 	 */
 	public B repository(JobRepository jobRepository) {
 		properties.jobRepository = jobRepository;
+		@SuppressWarnings("unchecked")
+		B result = (B) this;
+		return result;
+	}
+
+	/**
+	 * Registers objects using the annotation based listener configuration.
+	 *
+	 * @param listener the object that has a method configured with listener annotation
+	 * @return this for fluent chaining
+	 */
+	public B listener(Object listener) {
+		Set<Method> jobExecutionListenerMethods = new HashSet<>();
+		jobExecutionListenerMethods.addAll(ReflectionUtils.findMethod(listener.getClass(), BeforeJob.class));
+		jobExecutionListenerMethods.addAll(ReflectionUtils.findMethod(listener.getClass(), AfterJob.class));
+
+		if(jobExecutionListenerMethods.size() > 0) {
+			JobListenerFactoryBean factory = new JobListenerFactoryBean();
+			factory.setDelegate(listener);
+			properties.addJobExecutionListener((JobExecutionListener) factory.getObject());
+		}
+
 		@SuppressWarnings("unchecked")
 		B result = (B) this;
 		return result;
@@ -164,7 +193,7 @@ public abstract class JobBuilderHelper<B extends JobBuilderHelper<B>> {
 
 	public static class CommonJobProperties {
 
-		private Set<JobExecutionListener> jobExecutionListeners = new LinkedHashSet<JobExecutionListener>();
+		private Set<JobExecutionListener> jobExecutionListeners = new LinkedHashSet<>();
 
 		private boolean restartable = true;
 
@@ -181,7 +210,7 @@ public abstract class JobBuilderHelper<B extends JobBuilderHelper<B>> {
 			this.name = properties.name;
 			this.restartable = properties.restartable;
 			this.jobRepository = properties.jobRepository;
-			this.jobExecutionListeners = new LinkedHashSet<JobExecutionListener>(properties.jobExecutionListeners);
+			this.jobExecutionListeners = new LinkedHashSet<>(properties.jobExecutionListeners);
 			this.jobParametersIncrementer = properties.jobParametersIncrementer;
 			this.jobParametersValidator = properties.jobParametersValidator;
 		}
@@ -219,7 +248,7 @@ public abstract class JobBuilderHelper<B extends JobBuilderHelper<B>> {
 		}
 
 		public List<JobExecutionListener> getJobExecutionListeners() {
-			return new ArrayList<JobExecutionListener>(jobExecutionListeners);
+			return new ArrayList<>(jobExecutionListeners);
 		}
 
 		public void addStepExecutionListeners(List<JobExecutionListener> jobExecutionListeners) {

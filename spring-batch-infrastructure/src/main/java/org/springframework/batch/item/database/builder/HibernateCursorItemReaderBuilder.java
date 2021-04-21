@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,20 +20,24 @@ import java.util.Map;
 import org.hibernate.SessionFactory;
 
 import org.springframework.batch.item.database.HibernateCursorItemReader;
+import org.springframework.batch.item.database.orm.HibernateNativeQueryProvider;
 import org.springframework.batch.item.database.orm.HibernateQueryProvider;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 
 /**
  * This is a builder for the {@link HibernateCursorItemReader}.  When configuring, one of
- * the following should be provided:
+ * the following should be provided (listed in order of precedence):
  * <ul>
- *     <li>{@link #queryString(String)}</li>
- *     <li>{@link #queryName(String)}</li>
  *     <li>{@link #queryProvider(HibernateQueryProvider)}</li>
+ *     <li>{@link #queryName(String)}</li>
+ *     <li>{@link #queryString(String)}</li>
+ *     <li>{@link #nativeQuery(String)} and {@link #entityClass(Class)}</li>
  * </ul>
  *
  * @author Michael Minella
+ * @author Glenn Renfro
+ * @author Mahmoud Ben Hassine
  * @since 4.0
  * @see HibernateCursorItemReader
  */
@@ -53,24 +57,69 @@ public class HibernateCursorItemReaderBuilder<T> {
 
 	private boolean useStatelessSession;
 
-	private int currentItem;
+	private String nativeQuery;
 
-	private int maxItemCount = Integer.MAX_VALUE;
+	private Class<T> nativeClass;
 
 	private boolean saveState = true;
 
 	private String name;
 
+	private int maxItemCount = Integer.MAX_VALUE;
+
+	private int currentItemCount;
+
 	/**
-	 * A name used to prevent key collisions while saving the state in the
-	 * {@link org.springframework.batch.item.ExecutionContext}
+	 * Configure if the state of the {@link org.springframework.batch.item.ItemStreamSupport}
+	 * should be persisted within the {@link org.springframework.batch.item.ExecutionContext}
+	 * for restart purposes.
 	 *
-	 * @param name unique name for this reader instance
-	 * @return this instance for method chaining
-	 * @see HibernateCursorItemReader#setName(String)
+	 * @param saveState defaults to true
+	 * @return The current instance of the builder.
+	 */
+	public HibernateCursorItemReaderBuilder<T> saveState(boolean saveState) {
+		this.saveState = saveState;
+
+		return this;
+	}
+
+	/**
+	 * The name used to calculate the key within the
+	 * {@link org.springframework.batch.item.ExecutionContext}. Required if
+	 * {@link #saveState(boolean)} is set to true.
+	 *
+	 * @param name name of the reader instance
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.ItemStreamSupport#setName(String)
 	 */
 	public HibernateCursorItemReaderBuilder<T> name(String name) {
 		this.name = name;
+
+		return this;
+	}
+
+	/**
+	 * Configure the max number of items to be read.
+	 *
+	 * @param maxItemCount the max items to be read
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setMaxItemCount(int)
+	 */
+	public HibernateCursorItemReaderBuilder<T> maxItemCount(int maxItemCount) {
+		this.maxItemCount = maxItemCount;
+
+		return this;
+	}
+
+	/**
+	 * Index for the current item. Used on restarts to indicate where to start from.
+	 *
+	 * @param currentItemCount current index
+	 * @return this instance for method chaining
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setCurrentItemCount(int)
+	 */
+	public HibernateCursorItemReaderBuilder<T> currentItemCount(int currentItemCount) {
+		this.currentItemCount = currentItemCount;
 
 		return this;
 	}
@@ -148,7 +197,7 @@ public class HibernateCursorItemReaderBuilder<T> {
 	/**
 	 * The Hibernate {@link SessionFactory} to execute the query against.
 	 *
-	 * @param sessionFactory the session factorry
+	 * @param sessionFactory the session factory
 	 * @return this instance for method chaining
 	 * @see HibernateCursorItemReader#setSessionFactory(SessionFactory)
 	 */
@@ -166,48 +215,26 @@ public class HibernateCursorItemReaderBuilder<T> {
 	 * @return this instance for method chaining
 	 * @see HibernateCursorItemReader#setUseStatelessSession(boolean)
 	 */
-	public HibernateCursorItemReaderBuilder<T> useSatelessSession(boolean useStatelessSession) {
+	public HibernateCursorItemReaderBuilder<T> useStatelessSession(boolean useStatelessSession) {
 		this.useStatelessSession = useStatelessSession;
 
 		return this;
 	}
 
 	/**
-	 * Index for the current item.  Used on restarts to indicate where to start from.
+	 * Used to configure a {@link HibernateNativeQueryProvider}.  This is ignored if
 	 *
-	 * @param currentItem current index
+	 * @param nativeQuery {@link String} containing the native query.
 	 * @return this instance for method chaining
-	 * @see HibernateCursorItemReader#setCurrentItemCount(int)
 	 */
-	public HibernateCursorItemReaderBuilder<T> currentItem(int currentItem) {
-		this.currentItem = currentItem;
+	public HibernateCursorItemReaderBuilder<T> nativeQuery(String nativeQuery) {
+		this.nativeQuery = nativeQuery;
 
 		return this;
 	}
 
-	/**
-	 * The index of the max item to be read.
-	 *
-	 * @param maxItemCount max index
-	 * @return this instance for method chaining
-	 * @see HibernateCursorItemReader#setMaxItemCount(int)
-	 */
-	public HibernateCursorItemReaderBuilder<T> maxItemCount(int maxItemCount) {
-		this.maxItemCount = maxItemCount;
-
-		return this;
-	}
-
-	/**
-	 * Indicates if the state should be saved.  If set to false, restarts will begin at
-	 * the beginning of the dataset.  Defaults to true
-	 *
-	 * @param saveState indicator
-	 * @return this instance for method chaining
-	 * @see HibernateCursorItemReader#setSaveState(boolean)
-	 */
-	public HibernateCursorItemReaderBuilder<T> saveState(boolean saveState) {
-		this.saveState = saveState;
+	public HibernateCursorItemReaderBuilder<T> entityClass(Class<T> nativeClass) {
+		this.nativeClass = nativeClass;
 
 		return this;
 	}
@@ -226,21 +253,42 @@ public class HibernateCursorItemReaderBuilder<T> {
 					"A name is required when saveState is set to true.");
 		}
 
-		if (queryProvider == null) {
-			Assert.state(StringUtils.hasText(queryString) ^ StringUtils.hasText(queryName),
-					"queryString or queryName must be set");
-		}
-
 		HibernateCursorItemReader<T> reader = new HibernateCursorItemReader<>();
 
 		reader.setFetchSize(this.fetchSize);
 		reader.setParameterValues(this.parameterValues);
-		reader.setQueryName(this.queryName);
-		reader.setQueryProvider(this.queryProvider);
-		reader.setQueryString(this.queryString);
+
+		if(this.queryProvider != null) {
+			reader.setQueryProvider(this.queryProvider);
+		}
+		else if(StringUtils.hasText(this.queryName)) {
+			reader.setQueryName(this.queryName);
+		}
+		else if(StringUtils.hasText(this.queryString)) {
+			reader.setQueryString(this.queryString);
+		}
+		else if(StringUtils.hasText(this.nativeQuery) && this.nativeClass != null) {
+			HibernateNativeQueryProvider<T> provider = new HibernateNativeQueryProvider<>();
+			provider.setSqlQuery(this.nativeQuery);
+			provider.setEntityClass(this.nativeClass);
+
+			try {
+				provider.afterPropertiesSet();
+			}
+			catch (Exception e) {
+				throw new IllegalStateException("Unable to initialize the HibernateNativeQueryProvider", e);
+			}
+
+			reader.setQueryProvider(provider);
+		}
+		else {
+			throw new IllegalStateException("A HibernateQueryProvider, queryName, queryString, " +
+					"or both the nativeQuery and entityClass must be configured");
+		}
+
 		reader.setSessionFactory(this.sessionFactory);
 		reader.setUseStatelessSession(this.useStatelessSession);
-		reader.setCurrentItemCount(this.currentItem);
+		reader.setCurrentItemCount(this.currentItemCount);
 		reader.setMaxItemCount(this.maxItemCount);
 		reader.setName(this.name);
 		reader.setSaveState(this.saveState);

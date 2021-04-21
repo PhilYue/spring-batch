@@ -1,11 +1,11 @@
 /*
- * Copyright 2006-2014 the original author or authors.
+ * Copyright 2006-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,7 +39,12 @@ import org.springframework.transaction.PlatformTransactionManager;
  * multi-threaded step.
  * 
  * @author Robert Kasanicky
+ * @author Mahmoud Ben Hassine
+ * 
+ * @deprecated as of v4.3 in favor or using the {@link JobRepositoryFactoryBean}
+ * with an in-memory database. Scheduled for removal in v5.0.
  */
+@Deprecated
 public class MapJobRepositoryFactoryBean extends AbstractJobRepositoryFactoryBean {
 
 	private MapJobExecutionDao jobExecutionDao;

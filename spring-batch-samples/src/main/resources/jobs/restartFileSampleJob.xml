@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.springframework.org/schema/batch http://www.springframework.org/schema/batch/spring-batch.xsd
-		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+	xsi:schemaLocation="http://www.springframework.org/schema/batch https://www.springframework.org/schema/batch/spring-batch.xsd
+		http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
 
 	<job id="ioSampleJob" xmlns="http://www.springframework.org/schema/batch">
 		<step id="step1">
@@ -61,6 +61,6 @@
 	</bean>
 
 	<bean id="outputResource" class="org.springframework.core.io.FileSystemResource">
-		<constructor-arg value="build/test-outputs/restartFileOutput.csv" />
+		<constructor-arg value="target/test-outputs/restartFileOutput.csv" />
 	</bean>
 </beans>

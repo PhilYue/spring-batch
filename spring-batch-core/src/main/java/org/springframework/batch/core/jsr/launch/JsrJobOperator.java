@@ -1,11 +1,11 @@
 /*
- * Copyright 2013-2017 the original author or authors.
+ * Copyright 2013-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -104,7 +104,7 @@ import org.springframework.util.Assert;
  * 	&lt;/bean&gt;
  *
  * 	&lt;bean id="dataSource"
- * 		class="org.apache.commons.dbcp.BasicDataSource"&gt;
+ * 		class="org.apache.commons.dbcp2.BasicDataSource"&gt;
  * 		...
  * 	&lt;/bean&gt;
  *
@@ -138,6 +138,7 @@ import org.springframework.util.Assert;
  *
  * @author Michael Minella
  * @author Chris Schaefer
+ * @author Mahmoud Ben Hassine
  * @since 3.0
  */
 public class JsrJobOperator implements JobOperator, ApplicationContextAware, InitializingBean {
@@ -174,9 +175,10 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 	 * an {@link ApplicationContext}.  This constructor does not and is therefore dependency injection
 	 * friendly.  Also useful for unit testing.
 	 *
-	 * @param jobExplorer an instance of Spring Batch's {@link JobExplorer}
-	 * @param jobRepository an instance of Spring Batch's {@link JobOperator}
-	 * @param jobParametersConverter an instance of Spring Batch's {@link JobParametersConverter}
+	 * @param jobExplorer an instance of Spring Batch's {@link JobExplorer}.
+	 * @param jobRepository an instance of Spring Batch's {@link JobOperator}.
+	 * @param jobParametersConverter an instance of Spring Batch's {@link JobParametersConverter}.
+	 * @param transactionManager a {@link PlatformTransactionManager}.
 	 */
 	public JsrJobOperator(JobExplorer jobExplorer, JobRepository jobRepository, JobParametersConverter jobParametersConverter, PlatformTransactionManager transactionManager) {
 		Assert.notNull(jobExplorer, "A JobExplorer is required");
@@ -289,7 +291,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 			throw new NoSuchJobInstanceException("Unable to find JobInstance " + jobInstance.getInstanceId());
 		}
 
-		List<JobExecution> results = new ArrayList<JobExecution>(batchExecutions.size());
+		List<JobExecution> results = new ArrayList<>(batchExecutions.size());
 		for (org.springframework.batch.core.JobExecution jobExecution : batchExecutions) {
 			results.add(new JsrJobExecution(jobExecution, jobParametersConverter));
 		}
@@ -343,7 +345,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 			throw new NoSuchJobException("The job was not found");
 		}
 
-		return new ArrayList<JobInstance>(jobInstances);
+		return new ArrayList<>(jobInstances);
 	}
 
 	/* (non-Javadoc)
@@ -351,7 +353,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 	 */
 	@Override
 	public Set<String> getJobNames() throws JobSecurityException {
-		return new HashSet<String>(jobExplorer.getJobNames());
+		return new HashSet<>(jobExplorer.getJobNames());
 	}
 
 	/* (non-Javadoc)
@@ -384,7 +386,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 			throw new NoSuchJobException("Job name: " + name + " not found.");
 		}
 
-		List<Long> results = new ArrayList<Long>(findRunningJobExecutions.size());
+		List<Long> results = new ArrayList<>(findRunningJobExecutions.size());
 
 		for (org.springframework.batch.core.JobExecution jobExecution : findRunningJobExecutions) {
 			results.add(jobExecution.getId());
@@ -407,7 +409,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 
 		Collection<org.springframework.batch.core.StepExecution> executions = execution.getStepExecutions();
 
-		List<StepExecution> batchExecutions = new ArrayList<StepExecution>();
+		List<StepExecution> batchExecutions = new ArrayList<>();
 
 		if(executions != null) {
 			for (org.springframework.batch.core.StepExecution stepExecution : executions) {
@@ -501,7 +503,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 
 		try {
 			final Semaphore semaphore = new Semaphore(1);
-			final List<Exception> exceptionHolder = Collections.synchronizedList(new ArrayList<Exception>());
+			final List<Exception> exceptionHolder = Collections.synchronizedList(new ArrayList<>());
 			semaphore.acquire();
 
 			taskExecutor.execute(new Runnable() {
@@ -654,7 +656,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 
 		try {
 			final Semaphore semaphore = new Semaphore(1);
-			final List<Exception> exceptionHolder = Collections.synchronizedList(new ArrayList<Exception>());
+			final List<Exception> exceptionHolder = Collections.synchronizedList(new ArrayList<>());
 			semaphore.acquire();
 
 			taskExecutor.execute(new Runnable() {
@@ -717,8 +719,8 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 	 * Stops the running job execution if it is currently running.
 	 *
 	 * @param executionId the database id for the {@link JobExecution} to be stopped.
-	 * @throws NoSuchJobExecutionException
-	 * @throws JobExecutionNotRunningException
+	 * @throws NoSuchJobExecutionException thrown if {@link JobExecution} instance does not exist.
+	 * @throws JobExecutionNotRunningException thrown if {@link JobExecution} is not running.
 	 */
 	@Override
 	public void stop(long executionId) throws NoSuchJobExecutionException,
@@ -771,7 +773,7 @@ public class JsrJobOperator implements JobOperator, ApplicationContextAware, Ini
 
 	private static class ExecutingJobRegistry {
 
-		private Map<Long, Job> registry = new ConcurrentHashMap<Long, Job>();
+		private Map<Long, Job> registry = new ConcurrentHashMap<>();
 
 		public void register(Job job, org.springframework.batch.core.JobExecution jobExecution) throws DuplicateJobException {
 

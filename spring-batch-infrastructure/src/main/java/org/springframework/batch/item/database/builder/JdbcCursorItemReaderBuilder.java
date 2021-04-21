@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +18,11 @@ package org.springframework.batch.item.database.builder;
 import java.util.List;
 import javax.sql.DataSource;
 
-import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.item.database.AbstractCursorItemReader;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
-import org.springframework.batch.item.database.support.ListPreparedStatementSetter;
-import org.springframework.beans.factory.InitializingBean;
 import org.springframework.jdbc.core.ArgumentPreparedStatementSetter;
 import org.springframework.jdbc.core.ArgumentTypePreparedStatementSetter;
+import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.PreparedStatementSetter;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.util.Assert;
@@ -34,6 +32,10 @@ import org.springframework.util.StringUtils;
  * Builder for the {@link JdbcCursorItemReader}
  *
  * @author Michael Minella
+ * @author Glenn Renfro
+ * @author Drummond Dawson
+ * @author Mahmoud Ben Hassine
+ * @author Ankur Trapasiya
  * @since 4.0
  */
 public class JdbcCursorItemReaderBuilder<T> {
@@ -46,10 +48,6 @@ public class JdbcCursorItemReaderBuilder<T> {
 
 	private int queryTimeout = AbstractCursorItemReader.VALUE_NOT_SET;
 
-	private int currentItemCount = 0;
-
-	private int maxItemCount = Integer.MAX_VALUE;
-
 	private boolean ignoreWarnings;
 
 	private boolean verifyCursorPosition;
@@ -58,15 +56,76 @@ public class JdbcCursorItemReaderBuilder<T> {
 
 	private boolean useSharedExtendedConnection;
 
-	private boolean saveState = true;
-
 	private PreparedStatementSetter preparedStatementSetter;
 
 	private String sql;
 
+	private RowMapper<T> rowMapper;
+
+	private boolean saveState = true;
+
 	private String name;
 
-	private RowMapper<T> rowMapper;
+	private int maxItemCount = Integer.MAX_VALUE;
+
+	private int currentItemCount;
+
+	private boolean connectionAutoCommit;
+
+	/**
+	 * Configure if the state of the {@link org.springframework.batch.item.ItemStreamSupport}
+	 * should be persisted within the {@link org.springframework.batch.item.ExecutionContext}
+	 * for restart purposes.
+	 *
+	 * @param saveState defaults to true
+	 * @return The current instance of the builder.
+	 */
+	public JdbcCursorItemReaderBuilder<T> saveState(boolean saveState) {
+		this.saveState = saveState;
+
+		return this;
+	}
+
+	/**
+	 * The name used to calculate the key within the
+	 * {@link org.springframework.batch.item.ExecutionContext}. Required if
+	 * {@link #saveState(boolean)} is set to true.
+	 *
+	 * @param name name of the reader instance
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.ItemStreamSupport#setName(String)
+	 */
+	public JdbcCursorItemReaderBuilder<T> name(String name) {
+		this.name = name;
+
+		return this;
+	}
+
+	/**
+	 * Configure the max number of items to be read.
+	 *
+	 * @param maxItemCount the max items to be read
+	 * @return The current instance of the builder.
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setMaxItemCount(int)
+	 */
+	public JdbcCursorItemReaderBuilder<T> maxItemCount(int maxItemCount) {
+		this.maxItemCount = maxItemCount;
+
+		return this;
+	}
+
+	/**
+	 * Index for the current item. Used on restarts to indicate where to start from.
+	 *
+	 * @param currentItemCount current index
+	 * @return this instance for method chaining
+	 * @see org.springframework.batch.item.support.AbstractItemCountingItemStreamItemReader#setCurrentItemCount(int)
+	 */
+	public JdbcCursorItemReaderBuilder<T> currentItemCount(int currentItemCount) {
+		this.currentItemCount = currentItemCount;
+
+		return this;
+	}
 
 	/**
 	 * The {@link DataSource} to read from
@@ -116,49 +175,6 @@ public class JdbcCursorItemReaderBuilder<T> {
 	 */
 	public JdbcCursorItemReaderBuilder<T> queryTimeout(int queryTimeout) {
 		this.queryTimeout = queryTimeout;
-
-		return this;
-	}
-
-	/**
-	 * The index of the first record to begin reading from.  Overridden if a previous value
-	 * is provided via the {@link org.springframework.batch.item.ExecutionContext} on
-	 * {@link org.springframework.batch.item.ItemStream#open(ExecutionContext)}
-	 *
-	 * @param currentItemCount current index
-	 * @return this instance for method chaining
-	 * @see JdbcCursorItemReader#setCurrentItemCount(int)
-	 */
-	public JdbcCursorItemReaderBuilder<T> currentItemCount(int currentItemCount) {
-		this.currentItemCount = currentItemCount;
-
-		return this;
-	}
-
-	/**
-	 * The max number of items to be read.  Overriden if a previous value is povided via
-	 * the {@link ExecutionContext} on {@link org.springframework.batch.item.ItemStream#open}
-	 *
-	 * @param maxItemCount count
-	 * @return this instance for method chaining
-	 * @see JdbcCursorItemReader#setMaxItemCount(int)
-	 */
-	public JdbcCursorItemReaderBuilder<T> maxItemCount(int maxItemCount) {
-		this.maxItemCount = maxItemCount;
-
-		return this;
-	}
-
-	/**
-	 * Indicates if the state of the reader should be persisted in the
-	 * {@link ExecutionContext}.  Defaults to true.
-	 *
-	 * @param saveState indicator.  Defaults to true
-	 * @return this instance for method chaining
-	 * @see JdbcCursorItemReader#setSaveState(boolean)
-	 */
-	public JdbcCursorItemReaderBuilder<T> saveState(boolean saveState) {
-		this.saveState = saveState;
 
 		return this;
 	}
@@ -233,7 +249,7 @@ public class JdbcCursorItemReaderBuilder<T> {
 	 * @param args values to set on the reader query
 	 * @return this instance for method chaining
 	 */
-	public JdbcCursorItemReaderBuilder<T> queryArguments(Object[] args) {
+	public JdbcCursorItemReaderBuilder<T> queryArguments(Object... args) {
 		this.preparedStatementSetter = new ArgumentPreparedStatementSetter(args);
 
 		return this;
@@ -260,14 +276,10 @@ public class JdbcCursorItemReaderBuilder<T> {
 	 *
 	 * @param args values to set on the query
 	 * @return this instance for method chaining
-	 * @throws Exception from {@link InitializingBean#afterPropertiesSet()}
 	 */
-	public JdbcCursorItemReaderBuilder<T> queryArguments(List<?> args) throws Exception {
-		ListPreparedStatementSetter listPreparedStatementSetter = new ListPreparedStatementSetter(args);
-
-		listPreparedStatementSetter.afterPropertiesSet();
-
-		this.preparedStatementSetter = listPreparedStatementSetter;
+	public JdbcCursorItemReaderBuilder<T> queryArguments(List<?> args) {
+		Assert.notNull(args, "The list of arguments must not be null");
+		this.preparedStatementSetter = new ArgumentPreparedStatementSetter(args.toArray());
 
 		return this;
 	}
@@ -299,15 +311,29 @@ public class JdbcCursorItemReaderBuilder<T> {
 	}
 
 	/**
-	 * A name used to prevent key collisions while saving state in the
-	 * {@link ExecutionContext}.
+	 * Creates a {@link BeanPropertyRowMapper} to be used as your
+	 * {@link RowMapper}.
 	 *
-	 * @param name unique name for this reader instance
+	 * @param mappedClass the class for the row mapper
 	 * @return this instance for method chaining
-	 * @see JdbcCursorItemReader#setName(String)
+	 * @see BeanPropertyRowMapper
 	 */
-	public JdbcCursorItemReaderBuilder<T> name(String name) {
-		this.name = name;
+	public JdbcCursorItemReaderBuilder<T> beanRowMapper(Class<T> mappedClass) {
+		this.rowMapper = new BeanPropertyRowMapper<>(mappedClass);
+
+		return this;
+	}
+
+	/**
+	 * Set whether "autoCommit" should be overridden for the connection used by the cursor.
+	 * If not set, defaults to Connection / Datasource default configuration.
+	 *
+	 * @param connectionAutoCommit value to set on underlying JDBC connection
+	 * @return this instance for method chaining
+	 * @see JdbcCursorItemReader#setConnectionAutoCommit(boolean)
+	 */
+	public JdbcCursorItemReaderBuilder<T> connectionAutoCommit(boolean connectionAutoCommit) {
+		this.connectionAutoCommit = connectionAutoCommit;
 
 		return this;
 	}
@@ -320,7 +346,7 @@ public class JdbcCursorItemReaderBuilder<T> {
 	public JdbcCursorItemReader<T> build() {
 		if(this.saveState) {
 			Assert.hasText(this.name,
-					"A name is required when saveSate is set to true");
+					"A name is required when saveState is set to true");
 		}
 
 		Assert.hasText(this.sql, "A query is required");
@@ -347,6 +373,7 @@ public class JdbcCursorItemReaderBuilder<T> {
 		reader.setQueryTimeout(this.queryTimeout);
 		reader.setUseSharedExtendedConnection(this.useSharedExtendedConnection);
 		reader.setVerifyCursorPosition(this.verifyCursorPosition);
+		reader.setConnectionAutoCommit(this.connectionAutoCommit);
 
 		return reader;
 	}

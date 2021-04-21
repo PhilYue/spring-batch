@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,11 @@
  */
 package org.springframework.batch.core.configuration.annotation;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.aop.target.AbstractLazyCreationTargetSource;
 import org.springframework.batch.core.configuration.JobRegistry;
@@ -30,8 +33,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import java.util.concurrent.atomic.AtomicReference;
-
 /**
  * Base {@code Configuration} class providing common structure for enabling and using Spring Batch. Customization is
  * available by implementing the {@link BatchConfigurer} interface. The main components are created as lazy proxies that
@@ -43,7 +44,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 2.2
  * @see EnableBatchProcessing
  */
-@Configuration
+@Configuration(proxyBeanMethods = false)
 public class SimpleBatchConfiguration extends AbstractBatchConfiguration {
 
 	@Autowired
@@ -51,15 +52,15 @@ public class SimpleBatchConfiguration extends AbstractBatchConfiguration {
 
 	private boolean initialized = false;
 
-	private AtomicReference<JobRepository> jobRepository = new AtomicReference<JobRepository>();
+	private AtomicReference<JobRepository> jobRepository = new AtomicReference<>();
 
-	private AtomicReference<JobLauncher> jobLauncher = new AtomicReference<JobLauncher>();
+	private AtomicReference<JobLauncher> jobLauncher = new AtomicReference<>();
 
-	private AtomicReference<JobRegistry> jobRegistry = new AtomicReference<JobRegistry>();
+	private AtomicReference<JobRegistry> jobRegistry = new AtomicReference<>();
 
-	private AtomicReference<PlatformTransactionManager> transactionManager = new AtomicReference<PlatformTransactionManager>();
+	private AtomicReference<PlatformTransactionManager> transactionManager = new AtomicReference<>();
 
-	private AtomicReference<JobExplorer> jobExplorer = new AtomicReference<JobExplorer>();
+	private AtomicReference<JobExplorer> jobExplorer = new AtomicReference<>();
 
 	@Override
 	@Bean
@@ -93,7 +94,7 @@ public class SimpleBatchConfiguration extends AbstractBatchConfiguration {
 
 	private <T> T createLazyProxy(AtomicReference<T> reference, Class<T> type) {
 		ProxyFactory factory = new ProxyFactory();
-		factory.setTargetSource(new ReferenceTargetSource<T>(reference));
+		factory.setTargetSource(new ReferenceTargetSource<>(reference));
 		factory.addAdvice(new PassthruAdvice());
 		factory.setInterfaces(new Class<?>[] { type });
 		@SuppressWarnings("unchecked")

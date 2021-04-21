@@ -1,11 +1,11 @@
 /*
- * Copyright 2017 the original author or authors.
+ * Copyright 2017-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,6 +46,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * @author Michael Minella
+ * @author Parikshit Dutta
+ * @author Mahmoud Ben Hassine
  */
 public class StaxEventItemWriterBuilderTests {
 
@@ -56,24 +58,24 @@ public class StaxEventItemWriterBuilderTests {
 	private Marshaller marshaller;
 
 	private static final String FULL_OUTPUT = "<?xml version='1.1' encoding='UTF-16'?>" +
-			"<foobarred baz=\"quix\">\uFEFF<ns:group><ns2:item xmlns:ns2=\"http://www.springframework.org/test\">" +
+			"<foobarred baz=\"quix\">\uFEFF<ns:group><ns2:item xmlns:ns2=\"https://www.springframework.org/test\">" +
 			"<first>1</first><second>two</second><third>three</third></ns2:item>\uFEFF" +
-			"<ns2:item xmlns:ns2=\"http://www.springframework.org/test\"><first>4</first>" +
+			"<ns2:item xmlns:ns2=\"https://www.springframework.org/test\"><first>4</first>" +
 			"<second>five</second><third>six</third></ns2:item>\uFEFF" +
-			"<ns2:item xmlns:ns2=\"http://www.springframework.org/test\"><first>7</first>" +
+			"<ns2:item xmlns:ns2=\"https://www.springframework.org/test\"><first>7</first>" +
 			"<second>eight</second><third>nine</third></ns2:item>\uFEFF</ns:group>\uFEFF" +
 			"</foobarred>";
 
-	private static final String SIMPLE_OUTPUT = "<root><ns2:item xmlns:ns2=\"http://www.springframework.org/test\">" +
+	private static final String SIMPLE_OUTPUT = "<root><ns2:item xmlns:ns2=\"https://www.springframework.org/test\">" +
 			"<first>1</first><second>two</second><third>three</third></ns2:item>" +
-			"<ns2:item xmlns:ns2=\"http://www.springframework.org/test\"><first>4</first>" +
+			"<ns2:item xmlns:ns2=\"https://www.springframework.org/test\"><first>4</first>" +
 			"<second>five</second><third>six</third></ns2:item>" +
-			"<ns2:item xmlns:ns2=\"http://www.springframework.org/test\"><first>7</first>" +
+			"<ns2:item xmlns:ns2=\"https://www.springframework.org/test\"><first>7</first>" +
 			"<second>eight</second><third>nine</third></ns2:item></root>";
 
 	@Before
 	public void setUp() throws IOException {
-		File directory = new File("build/data");
+		File directory = new File("target/data");
 		directory.mkdirs();
 		this.resource = new FileSystemResource(
 				File.createTempFile("StaxEventItemWriterBuilderTests", ".xml", directory));
@@ -171,7 +173,7 @@ public class StaxEventItemWriterBuilderTests {
 					XMLEventFactory factory = XMLEventFactory.newInstance();
 					try {
 						writer.add(factory.createEndElement("ns",
-								"http://www.springframework.org/test",
+								"https://www.springframework.org/test",
 								"group"));
 					}
 					catch (XMLStreamException e) {
@@ -182,7 +184,7 @@ public class StaxEventItemWriterBuilderTests {
 					XMLEventFactory factory = XMLEventFactory.newInstance();
 					try {
 						writer.add(factory.createStartElement("ns",
-								"http://www.springframework.org/test",
+								"https://www.springframework.org/test",
 								"group"));
 					}
 					catch (XMLStreamException e) {
@@ -224,13 +226,74 @@ public class StaxEventItemWriterBuilderTests {
 				.build();
 	}
 
-	private String getOutputFileContent(String encoding) throws IOException {
-		String value = FileUtils.readFileToString(resource.getFile(), encoding);
-		value = value.replace("<?xml version='1.0' encoding='" + encoding + "'?>", "");
-		return value;
+	@Test
+	public void testStandaloneDeclarationInHeaderWhenNotSet() throws Exception {
+		StaxEventItemWriter<Foo> staxEventItemWriter = new StaxEventItemWriterBuilder<Foo>()
+				.name("fooWriter")
+				.marshaller(marshaller)
+				.resource(this.resource)
+				.build();
+
+		staxEventItemWriter.afterPropertiesSet();
+
+		ExecutionContext executionContext = new ExecutionContext();
+		staxEventItemWriter.open(executionContext);
+		staxEventItemWriter.write(this.items);
+		staxEventItemWriter.close();
+
+		String output = getOutputFileContent(staxEventItemWriter.getEncoding());
+		assertFalse(output.contains("standalone="));
 	}
 
-	@XmlRootElement(name="item", namespace="http://www.springframework.org/test")
+	@Test
+	public void testStandaloneDeclarationInHeaderWhenSetToTrue() throws Exception {
+		StaxEventItemWriter<Foo> staxEventItemWriter = new StaxEventItemWriterBuilder<Foo>()
+				.name("fooWriter")
+				.marshaller(marshaller)
+				.resource(this.resource)
+				.standalone(true)
+				.build();
+
+		staxEventItemWriter.afterPropertiesSet();
+
+		ExecutionContext executionContext = new ExecutionContext();
+		staxEventItemWriter.open(executionContext);
+		staxEventItemWriter.write(this.items);
+		staxEventItemWriter.close();
+
+		String output = getOutputFileContent(staxEventItemWriter.getEncoding());
+		assertTrue(output.contains("standalone='yes'"));
+	}
+
+	@Test
+	public void testStandaloneDeclarationInHeaderWhenSetToFalse() throws Exception {
+		StaxEventItemWriter<Foo> staxEventItemWriter = new StaxEventItemWriterBuilder<Foo>()
+				.name("fooWriter")
+				.marshaller(marshaller)
+				.resource(this.resource)
+				.standalone(false)
+				.build();
+
+		staxEventItemWriter.afterPropertiesSet();
+
+		ExecutionContext executionContext = new ExecutionContext();
+		staxEventItemWriter.open(executionContext);
+		staxEventItemWriter.write(this.items);
+		staxEventItemWriter.close();
+
+		String output = getOutputFileContent(staxEventItemWriter.getEncoding());
+		assertTrue(output.contains("standalone='no'"));
+	}
+
+	/**
+	 * @param encoding the encoding
+	 * @return output file content as String
+	 */
+	private String getOutputFileContent(String encoding) throws IOException {
+		return FileUtils.readFileToString(resource.getFile(), encoding);
+	}
+
+	@XmlRootElement(name="item", namespace="https://www.springframework.org/test")
 	public static class Foo {
 		private int first;
 		private String second;

@@ -1,11 +1,11 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -46,6 +46,8 @@ import static org.junit.Assert.fail;
 
 /**
  * @author Michael Minella
+ * @author Drummond Dawson
+ * @author Ankur Trapasiya
  */
 public class JdbcCursorItemReaderBuilderTests {
 
@@ -156,7 +158,7 @@ public class JdbcCursorItemReaderBuilderTests {
 				.dataSource(this.dataSource)
 				.name("fooReader")
 				.sql("SELECT * FROM FOO WHERE FIRST > ? ORDER BY FIRST")
-				.queryArguments(new Integer[] {3})
+				.queryArguments(3)
 				.rowMapper((rs, rowNum) -> {
 					Foo foo = new Foo();
 
@@ -301,21 +303,15 @@ public class JdbcCursorItemReaderBuilderTests {
 				.ignoreWarnings(true)
 				.driverSupportsAbsolute(true)
 				.useSharedExtendedConnection(true)
-				.rowMapper((rs, rowNum) -> {
-					Foo foo = new Foo();
-
-					foo.setFirst(rs.getInt("FIRST"));
-					foo.setSecond(rs.getString("SECOND"));
-					foo.setThird(rs.getString("THIRD"));
-
-					return foo;
-				})
+				.connectionAutoCommit(true)
+				.beanRowMapper(Foo.class)
 				.build();
 
 		assertEquals(1, ReflectionTestUtils.getField(reader, "fetchSize"));
 		assertEquals(2, ReflectionTestUtils.getField(reader, "queryTimeout"));
 		assertTrue((boolean) ReflectionTestUtils.getField(reader, "ignoreWarnings"));
 		assertTrue((boolean) ReflectionTestUtils.getField(reader, "driverSupportsAbsolute"));
+		assertTrue((boolean) ReflectionTestUtils.getField(reader, "connectionAutoCommit"));
 	}
 
 	@Test
@@ -324,7 +320,7 @@ public class JdbcCursorItemReaderBuilderTests {
 			new JdbcCursorItemReaderBuilder<Foo>().saveState(true).build();
 		}
 		catch (IllegalArgumentException iae) {
-			assertEquals("A name is required when saveSate is set to true", iae.getMessage());
+			assertEquals("A name is required when saveState is set to true", iae.getMessage());
 		}
 		catch (Exception e) {
 			fail();
